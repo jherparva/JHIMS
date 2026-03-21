@@ -105,17 +105,14 @@ export async function POST(req: NextRequest) {
         const browserSessionId = Math.random().toString(36).substring(2, 15) + 
                                Math.random().toString(36).substring(2, 15)
         
-        // Usar cookie única por sesión (basada en ID de usuario)
-        let cookieDomain = process.env.NODE_ENV === "production" ? ".jhims.com" : "localhost"
+        // No especificamos dominio para que las cookies funcionen en cualquier host (incluido Vercel)
         const sessionCookieName = `jhims-session-${user._id.toString().substring(0, 8)}` // Cookie única por usuario
-        
         response.cookies.set(sessionCookieName, browserSessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
             maxAge: 60 * 60 * 24, // 24 horas
             path: "/",
-            domain: cookieDomain
         })
 
         // Establecer ID único de ventana para aislar sesiones
@@ -131,7 +128,6 @@ export async function POST(req: NextRequest) {
             sameSite: "lax",
             maxAge: 60 * 60 * 24, // 24 horas
             path: "/",
-            domain: cookieDomain
         })
 
         console.log(`LOGIN: Asignando windowId: ${windowId} para usuario: ${user.username} (${user.role}) - cookie: ${windowCookieName}`)

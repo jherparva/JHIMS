@@ -118,15 +118,13 @@ export async function middleware(request: NextRequest) {
             windowId = generateWindowId()
             
             // Usar cookie única por sesión (basada en ID de usuario)
-            let cookieDomain = process.env.NODE_ENV === "production" ? ".jhims.com" : "localhost"
-            
+            // No especificamos dominio para que las cookies funcionen en cualquier host (incluido Vercel)
             response.cookies.set(windowCookieName, windowId, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
                 maxAge: 60 * 60 * 24, // 24 horas
                 path: "/",
-                domain: cookieDomain
             })
             console.log(`MIDDLEWARE: Nuevo windowId asignado: ${windowId} para ruta: ${pathname} (cookie: ${windowCookieName})`)
         } else {
