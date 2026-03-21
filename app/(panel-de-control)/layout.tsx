@@ -4,6 +4,9 @@ import { Header } from "@/components/panel-de-control/header"
 import { getSession } from "@/lib/auth"
 import { redirect } from "next/navigation"
 
+export const dynamic = "force-dynamic";
+
+
 import { LayoutProvider } from "@/components/proveedores-componentes/LayoutProvider"
 import { SidebarWrapper } from "@/components/panel-de-control/SidebarWrapper"
 import { LayoutContent } from "@/components/panel-de-control/LayoutContent"
