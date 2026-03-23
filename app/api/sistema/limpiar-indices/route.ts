@@ -18,6 +18,11 @@ export async function GET() {
 
         await connectDB()
         const db = mongoose.connection.db
+        
+        if (!db) {
+            throw new Error('No se pudo establecer conexión con la base de datos (DB undefined)')
+        }
+
         const collection = db.collection('products')
 
         // 1. Ver índices actuales
