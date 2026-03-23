@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
 const JWT_SECRET = new TextEncoder().encode(
-    process.env.NEXTAUTH_SECRET || 'your-secret-key-change-in-production'
+    process.env.NEXTAUTH_SECRET || 'jhims-secret-key-2025'
 )
 
 // Rutas que solo puede acceder el administrador de empresa
@@ -89,12 +89,10 @@ export async function middleware(request: NextRequest) {
     }
 
     // PRIORIDAD 1: Detectar si es una nueva ventana/pestaña del navegador
-    // Esto evita que una sesión se "contamine" entre ventanas diferentes
-    if (isNewWindowSession(request)) {
+    // Solo aplicamos esto si NO es una ruta de inicio de sesión y no hay tokens conocidos.
+    if (!pathname.startsWith('/inicio-sesion') && isNewWindowSession(request)) {
         console.log("MIDDLEWARE: Nueva ventana detectada, redirigiendo a login para seguridad")
         const response = NextResponse.redirect(new URL('/inicio-sesion?session=new', request.url))
-        // No borramos el token de inmediato, permitimos que el login maneje si quiere "recuperar" la sesión
-        // Pero marcamos que es una nueva ventana
         return response
     }
 
