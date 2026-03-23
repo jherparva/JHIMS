@@ -1,4 +1,5 @@
 import mongoose, { Schema, type Document } from "mongoose"
+import { multiTenancyPlugin } from "../multi-tenancy-plugin"
 
 export interface IProduct extends Document {
     companyId: mongoose.Types.ObjectId
@@ -83,6 +84,9 @@ const ProductSchema = new Schema<IProduct>(
         timestamps: true,
     },
 )
+
+// Aplicar plugin de multi-tenancy
+ProductSchema.plugin(multiTenancyPlugin)
 
 // Índices
 ProductSchema.index({ companyId: 1, sku: 1 }, { unique: true })
