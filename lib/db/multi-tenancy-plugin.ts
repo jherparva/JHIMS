@@ -37,9 +37,26 @@ export function multiTenancyPlugin(schema: Schema) {
                 return
             }
 
-            // Superadmin puede acceder a datos de todas las empresas
+            // Superadmin puede acceder a datos de todas las empresas para modelos globales,
+            // pero para inquilinos debe especificar el companyId.
             if (context.role === 'superadmin') {
-                return
+                const modelName = this.model?.modelName || this.mongooseCollection?.name;
+                const isGlobalModel = modelName === 'User' || modelName === 'Ticket' || 
+                                      modelName === 'users' || modelName === 'tickets';
+                                      
+                if (isGlobalModel) {
+                    return;
+                }
+
+                const currentFilter = this.getFilter() || {};
+                
+                if (currentFilter.companyId) {
+                    return;
+                }
+
+                // Bloquear queries globales del superadmin en modelos de inquilinos
+                this.where({ companyId: null });
+                return;
             }
 
             // Si el usuario tiene companyId, filtrar por él

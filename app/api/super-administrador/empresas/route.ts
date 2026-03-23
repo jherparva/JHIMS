@@ -2,41 +2,107 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db/mongodb"
 import Company from "@/lib/db/models/Company"
 import User from "@/lib/db/models/User"
+import Product from "@/lib/db/models/Product"
 import Sale from "@/lib/db/models/Sale"
 import Category from "@/lib/db/models/Category"
 import { getSession } from "@/lib/auth"
-
-// Categorías por defecto según tipo de negocio
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
     tienda: [
-        "Alimentos",
-        "Bebidas",
-        "Aseo Personal",
-        "Aseo Hogar",
-        "Dulcería",
-        "Licores y Cigarrillos",
-        "Mascotas",
-        "Papelería",
-        "Otros"
+        "Abarrotes", "Lácteos y Huevos", "Carnes y Embutidos", "Bebidas y Jugos", 
+        "Licores y Cervezas", "Aseo Personal", "Aseo del Hogar", "Dulcería y Snacks", 
+        "Panadería", "Desechables", "Frutas y Verduras", "Mascotas", "Medicamentos Básicos", "Mecato Colombiano", "Otros"
     ],
     ferreteria: [
-        "Herramientas Manuales",
-        "Herramientas Eléctricas",
-        "Pinturas",
-        "Plomería",
-        "Electricidad",
-        "Tornillería",
-        "Construcción",
-        "Otros"
+        "Herramientas Manuales", "Herramientas Eléctricas", "Pinturas y Solventes", 
+        "Plomería y Tuberías", "Material Eléctrico", "Tornillería y Clavos", 
+        "Materiales de Construcción", "Cerrajería", "Adhesivos y Pegantes", "Abrasivos", "Madera y Tableros", "Otros"
     ],
     restaurante: [
-        "Entradas",
-        "Platos Fuertes",
-        "Bebidas",
-        "Postres",
-        "Licores",
-        "Adiciones",
-        "Otros"
+        "Entradas", "Sopas y Cremas", "Platos Fuertes", "Comida Rápida", 
+        "Bebidas Frias", "Bebidas Calientes", "Postres", "Licores y Cócteles", 
+        "Menú Infantil", "Adiciones y Extras", "Desayunos", "Otros"
+    ],
+    otro: ["General", "Servicios", "Productos", "Insumos", "Otros"]
+}
+
+// Productos comunes en Colombia pre-configurados (con precio/costo/stock en 0 para que el usuario solo rellene)
+const DEFAULT_PRODUCTS: Record<string, {name: string; cat: string}[]> = {
+    tienda: [
+        { name: "Arroz Roa 500g", cat: "Abarrotes" },
+        { name: "Arroz Diana 500g", cat: "Abarrotes" },
+        { name: "Aceite Gourmet 1000ml", cat: "Abarrotes" },
+        { name: "Panela Cuadrada", cat: "Abarrotes" },
+        { name: "Azúcar Manuelita 1kg", cat: "Abarrotes" },
+        { name: "Sal Refisal 1kg", cat: "Abarrotes" },
+        { name: "Café Sello Rojo 250g", cat: "Abarrotes" },
+        { name: "Huevos Tipo A x 30", cat: "Lácteos y Huevos" },
+        { name: "Leche Alquería Entera 1L", cat: "Lácteos y Huevos" },
+        { name: "Leche Colanta Entera 1L", cat: "Lácteos y Huevos" },
+        { name: "Queso Campesino", cat: "Lácteos y Huevos" },
+        { name: "Mantequilla Rama", cat: "Lácteos y Huevos" },
+        { name: "Salchicha Ranchera", cat: "Carnes y Embutidos" },
+        { name: "Chorizo Santarrosano", cat: "Carnes y Embutidos" },
+        { name: "Mortadela Tradicional", cat: "Carnes y Embutidos" },
+        { name: "Gaseosa Coca-Cola 350ml", cat: "Bebidas y Jugos" },
+        { name: "Gaseosa Postobón Manzana 350ml", cat: "Bebidas y Jugos" },
+        { name: "Jugo Hit Mora", cat: "Bebidas y Jugos" },
+        { name: "Pony Malta", cat: "Bebidas y Jugos" },
+        { name: "Agua Cristal 600ml", cat: "Bebidas y Jugos" },
+        { name: "Cerveza Poker Lata", cat: "Licores y Cervezas" },
+        { name: "Cerveza Aguila Lata", cat: "Licores y Cervezas" },
+        { name: "Cerveza Club Colombia Gold", cat: "Licores y Cervezas" },
+        { name: "Crema Dental Colgate", cat: "Aseo Personal" },
+        { name: "Papel Higiénico Familia", cat: "Aseo Personal" },
+        { name: "Jabón Rey", cat: "Aseo del Hogar" },
+        { name: "Detergente Ariel", cat: "Aseo del Hogar" },
+        { name: "Limpiador Fabuloso", cat: "Aseo del Hogar" },
+        { name: "Chocoramo", cat: "Dulcería y Snacks" },
+        { name: "Papas Margarita Pollo", cat: "Dulcería y Snacks" },
+        { name: "Papas Margarita Limón", cat: "Dulcería y Snacks" },
+        { name: "Detodito Mix", cat: "Dulcería y Snacks" },
+        { name: "Bombonbum", cat: "Dulcería y Snacks" },
+        { name: "Galletas Festival", cat: "Dulcería y Snacks" },
+        { name: "Galletas Saltín Noel", cat: "Dulcería y Snacks" }
+    ],
+    ferreteria: [
+        { name: "Martillo Goma", cat: "Herramientas Manuales" },
+        { name: "Destornillador Estrella", cat: "Herramientas Manuales" },
+        { name: "Destornillador Pala", cat: "Herramientas Manuales" },
+        { name: "Cinta de Enmascarar", cat: "Adhesivos y Pegantes" },
+        { name: "Cinta Aislante Negra", cat: "Material Eléctrico" },
+        { name: "Pintura Viniltex Blanco 1 Galón", cat: "Pinturas y Solventes" },
+        { name: "Thinner Corriente", cat: "Pinturas y Solventes" },
+        { name: "Tubo PVC Presión 1/2", cat: "Plomería y Tuberías" },
+        { name: "Pegante PVC", cat: "Adhesivos y Pegantes" },
+        { name: "Clavos Con Cabeza", cat: "Tornillería y Clavos" },
+        { name: "Tornillo Goloso", cat: "Tornillería y Clavos" },
+        { name: "Bombillo LED 9W", cat: "Material Eléctrico" },
+        { name: "Tomacorriente Doble", cat: "Material Eléctrico" },
+        { name: "Interruptor Sencillo", cat: "Material Eléctrico" },
+        { name: "Cemento Argos 50kg", cat: "Materiales de Construcción" }
+    ],
+    restaurante: [
+        { name: "Empanada de Carne", cat: "Entradas" },
+        { name: "Arepa de Choclo", cat: "Entradas" },
+        { name: "Patacón con Hogao", cat: "Entradas" },
+        { name: "Sancocho Trifásico", cat: "Sopas y Cremas" },
+        { name: "Ajiaco Santafereño", cat: "Sopas y Cremas" },
+        { name: "Bandeja Paisa", cat: "Platos Fuertes" },
+        { name: "Churrasco", cat: "Platos Fuertes" },
+        { name: "Pechuga a la Plancha", cat: "Platos Fuertes" },
+        { name: "Mojarra Frita", cat: "Platos Fuertes" },
+        { name: "Hamburguesa Sencilla", cat: "Comida Rápida" },
+        { name: "Hamburguesa Especial", cat: "Comida Rápida" },
+        { name: "Perro Caliente", cat: "Comida Rápida" },
+        { name: "Jugo Natural en Agua", cat: "Bebidas Frias" },
+        { name: "Jugo Natural en Leche", cat: "Bebidas Frias" },
+        { name: "Limonada Natural", cat: "Bebidas Frias" },
+        { name: "Gaseosa Envase 350ml", cat: "Bebidas Frias" },
+        { name: "Cerveza Nacional", cat: "Licores y Cócteles" },
+        { name: "Tinto", cat: "Bebidas Calientes" },
+        { name: "Chocolate", cat: "Bebidas Calientes" },
+        { name: "Arroz con Leche", cat: "Postres" },
+        { name: "Adición de Papas a la Francesa", cat: "Adiciones y Extras" }
     ]
 }
 
@@ -209,7 +275,7 @@ export async function POST(req: NextRequest) {
 
         // CREACIÓN AUTOMÁTICA DE CATEGORÍAS
         const defaultCats = DEFAULT_CATEGORIES[businessType] || DEFAULT_CATEGORIES.tienda
-        await Category.insertMany(
+        const createdCats = await Category.insertMany(
             defaultCats.map(catName => ({
                 companyId: company._id,
                 name: catName,
@@ -217,6 +283,39 @@ export async function POST(req: NextRequest) {
                 isActive: true
             }))
         )
+
+        // Mapear los _ids de las categorías creadas según su nombre para asociar los productos
+        const catMap = createdCats.reduce((acc, cat) => {
+            acc[cat.name] = cat._id
+            return acc
+        }, {} as Record<string, any>)
+
+        // CREACIÓN AUTOMÁTICA DE PRODUCTOS POR DEFECTO CON INVENTARIO EN CERO
+        const defaultProds = DEFAULT_PRODUCTS[businessType] || DEFAULT_PRODUCTS.tienda
+        
+        let skuCounter = 1;
+        const productsToInsert = defaultProds.map((prod:any) => {
+            // Asignar categoría creada (o la primera como fallback si no coincide)
+            const catId = catMap[prod.cat] || createdCats[0]?._id 
+            const paddedSku = skuCounter.toString().padStart(4, '0')
+            skuCounter++
+            
+            return {
+                companyId: company._id,
+                name: prod.name,
+                sku: `SKU-${businessType.substring(0,3).toUpperCase()}-${paddedSku}`,
+                category: catId,
+                purchasePrice: 0,
+                salePrice: 0,
+                stock: 0,
+                minStock: 5,
+                isActive: true
+            }
+        })
+        
+        if (productsToInsert.length > 0) {
+            await Product.insertMany(productsToInsert)
+        }
 
         return NextResponse.json({
             _id: company._id,

@@ -4,10 +4,105 @@ import Company from "@/lib/db/models/Company"
 import Category from "@/lib/db/models/Category"
 import { getSession } from "@/lib/auth"
 
+import Product from "@/lib/db/models/Product"
+
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
-    tienda: ["Alimentos", "Bebidas", "Aseo Personal", "Aseo Hogar", "Dulcería", "Licores y Cigarrillos", "Mascotas", "Papelería", "Otros"],
-    ferreteria: ["Herramientas Manuales", "Herramientas Eléctricas", "Pinturas", "Plomería", "Electricidad", "Tornillería", "Construcción", "Otros"],
-    restaurante: ["Entradas", "Platos Fuertes", "Bebidas", "Postres", "Licores", "Adiciones", "Otros"]
+    tienda: [
+        "Abarrotes", "Lácteos y Huevos", "Carnes y Embutidos", "Bebidas y Jugos", 
+        "Licores y Cervezas", "Aseo Personal", "Aseo del Hogar", "Dulcería y Snacks", 
+        "Panadería", "Desechables", "Frutas y Verduras", "Mascotas", "Medicamentos Básicos", "Mecato Colombiano", "Otros"
+    ],
+    ferreteria: [
+        "Herramientas Manuales", "Herramientas Eléctricas", "Pinturas y Solventes", 
+        "Plomería y Tuberías", "Material Eléctrico", "Tornillería y Clavos", 
+        "Materiales de Construcción", "Cerrajería", "Adhesivos y Pegantes", "Abrasivos", "Madera y Tableros", "Otros"
+    ],
+    restaurante: [
+        "Entradas", "Sopas y Cremas", "Platos Fuertes", "Comida Rápida", 
+        "Bebidas Frias", "Bebidas Calientes", "Postres", "Licores y Cócteles", 
+        "Menú Infantil", "Adiciones y Extras", "Desayunos", "Otros"
+    ],
+    otro: ["General", "Servicios", "Productos", "Insumos", "Otros"]
+}
+
+const DEFAULT_PRODUCTS: Record<string, {name: string; cat: string}[]> = {
+    tienda: [
+        { name: "Arroz Roa 500g", cat: "Abarrotes" },
+        { name: "Arroz Diana 500g", cat: "Abarrotes" },
+        { name: "Aceite Gourmet 1000ml", cat: "Abarrotes" },
+        { name: "Panela Cuadrada", cat: "Abarrotes" },
+        { name: "Azúcar Manuelita 1kg", cat: "Abarrotes" },
+        { name: "Sal Refisal 1kg", cat: "Abarrotes" },
+        { name: "Café Sello Rojo 250g", cat: "Abarrotes" },
+        { name: "Huevos Tipo A x 30", cat: "Lácteos y Huevos" },
+        { name: "Leche Alquería Entera 1L", cat: "Lácteos y Huevos" },
+        { name: "Leche Colanta Entera 1L", cat: "Lácteos y Huevos" },
+        { name: "Queso Campesino", cat: "Lácteos y Huevos" },
+        { name: "Mantequilla Rama", cat: "Lácteos y Huevos" },
+        { name: "Salchicha Ranchera", cat: "Carnes y Embutidos" },
+        { name: "Chorizo Santarrosano", cat: "Carnes y Embutidos" },
+        { name: "Mortadela Tradicional", cat: "Carnes y Embutidos" },
+        { name: "Gaseosa Coca-Cola 350ml", cat: "Bebidas y Jugos" },
+        { name: "Gaseosa Postobón Manzana 350ml", cat: "Bebidas y Jugos" },
+        { name: "Jugo Hit Mora", cat: "Bebidas y Jugos" },
+        { name: "Pony Malta", cat: "Bebidas y Jugos" },
+        { name: "Agua Cristal 600ml", cat: "Bebidas y Jugos" },
+        { name: "Cerveza Poker Lata", cat: "Licores y Cervezas" },
+        { name: "Cerveza Aguila Lata", cat: "Licores y Cervezas" },
+        { name: "Cerveza Club Colombia Gold", cat: "Licores y Cervezas" },
+        { name: "Crema Dental Colgate", cat: "Aseo Personal" },
+        { name: "Papel Higiénico Familia", cat: "Aseo Personal" },
+        { name: "Jabón Rey", cat: "Aseo del Hogar" },
+        { name: "Detergente Ariel", cat: "Aseo del Hogar" },
+        { name: "Limpiador Fabuloso", cat: "Aseo del Hogar" },
+        { name: "Chocoramo", cat: "Dulcería y Snacks" },
+        { name: "Papas Margarita Pollo", cat: "Dulcería y Snacks" },
+        { name: "Papas Margarita Limón", cat: "Dulcería y Snacks" },
+        { name: "Detodito Mix", cat: "Dulcería y Snacks" },
+        { name: "Bombonbum", cat: "Dulcería y Snacks" },
+        { name: "Galletas Festival", cat: "Dulcería y Snacks" },
+        { name: "Galletas Saltín Noel", cat: "Dulcería y Snacks" }
+    ],
+    ferreteria: [
+        { name: "Martillo Goma", cat: "Herramientas Manuales" },
+        { name: "Destornillador Estrella", cat: "Herramientas Manuales" },
+        { name: "Destornillador Pala", cat: "Herramientas Manuales" },
+        { name: "Cinta de Enmascarar", cat: "Adhesivos y Pegantes" },
+        { name: "Cinta Aislante Negra", cat: "Material Eléctrico" },
+        { name: "Pintura Viniltex Blanco 1 Galón", cat: "Pinturas y Solventes" },
+        { name: "Thinner Corriente", cat: "Pinturas y Solventes" },
+        { name: "Tubo PVC Presión 1/2", cat: "Plomería y Tuberías" },
+        { name: "Pegante PVC", cat: "Adhesivos y Pegantes" },
+        { name: "Clavos Con Cabeza", cat: "Tornillería y Clavos" },
+        { name: "Tornillo Goloso", cat: "Tornillería y Clavos" },
+        { name: "Bombillo LED 9W", cat: "Material Eléctrico" },
+        { name: "Tomacorriente Doble", cat: "Material Eléctrico" },
+        { name: "Interruptor Sencillo", cat: "Material Eléctrico" },
+        { name: "Cemento Argos 50kg", cat: "Materiales de Construcción" }
+    ],
+    restaurante: [
+        { name: "Empanada de Carne", cat: "Entradas" },
+        { name: "Arepa de Choclo", cat: "Entradas" },
+        { name: "Patacón con Hogao", cat: "Entradas" },
+        { name: "Sancocho Trifásico", cat: "Sopas y Cremas" },
+        { name: "Ajiaco Santafereño", cat: "Sopas y Cremas" },
+        { name: "Bandeja Paisa", cat: "Platos Fuertes" },
+        { name: "Churrasco", cat: "Platos Fuertes" },
+        { name: "Pechuga a la Plancha", cat: "Platos Fuertes" },
+        { name: "Mojarra Frita", cat: "Platos Fuertes" },
+        { name: "Hamburguesa Sencilla", cat: "Comida Rápida" },
+        { name: "Hamburguesa Especial", cat: "Comida Rápida" },
+        { name: "Perro Caliente", cat: "Comida Rápida" },
+        { name: "Jugo Natural en Agua", cat: "Bebidas Frias" },
+        { name: "Jugo Natural en Leche", cat: "Bebidas Frias" },
+        { name: "Limonada Natural", cat: "Bebidas Frias" },
+        { name: "Gaseosa Envase 350ml", cat: "Bebidas Frias" },
+        { name: "Cerveza Nacional", cat: "Licores y Cócteles" },
+        { name: "Tinto", cat: "Bebidas Calientes" },
+        { name: "Chocolate", cat: "Bebidas Calientes" },
+        { name: "Arroz con Leche", cat: "Postres" },
+        { name: "Adición de Papas a la Francesa", cat: "Adiciones y Extras" }
+    ]
 }
 
 export const dynamic = "force-dynamic"
@@ -76,6 +171,52 @@ export async function PATCH(
                     }))
                 )
             }
+
+            // Mapear todas las categorías (las nuevas y las existentes)
+            const allCats = await Category.find({ 
+                companyId: params.id,
+                name: { $in: defaultCats }
+            }).select('name _id')
+
+            const catMap = allCats.reduce((acc, cat) => {
+                acc[cat.name] = cat._id
+                return acc
+            }, {} as Record<string, any>)
+
+            // CREAR INVENTARIO POR DEFECTO
+            const defaultProds = DEFAULT_PRODUCTS[bType] || DEFAULT_PRODUCTS.tienda
+            
+            // Verificar qué productos ya existen para no duplicar
+            const existingProds = await Product.find({
+                companyId: params.id,
+                name: { $in: defaultProds.map(p => p.name) }
+            }).select('name')
+            
+            const existingProdNames = existingProds.map(p => p.name)
+            const prodsToInsert = defaultProds.filter(prod => !existingProdNames.includes(prod.name))
+
+            if (prodsToInsert.length > 0) {
+                let skuCounter = 1;
+                const newProducts = prodsToInsert.map(prod => {
+                    const catId = catMap[prod.cat] || allCats[0]?._id
+                    const paddedSku = skuCounter.toString().padStart(4, '0')
+                    skuCounter++
+                    
+                    return {
+                        companyId: params.id,
+                        name: prod.name,
+                        sku: `SKU-${bType.substring(0,3).toUpperCase()}-${Date.now().toString().substring(7)}-${paddedSku}`, // SKU único
+                        category: catId,
+                        purchasePrice: 0,
+                        salePrice: 0,
+                        stock: 0,
+                        minStock: 5,
+                        isActive: true
+                    }
+                })
+                
+                await Product.insertMany(newProducts)
+            }
         }
 
         return NextResponse.json({ success: true, company })
@@ -97,7 +238,30 @@ export async function DELETE(
 
     try {
         await connectDB()
-        await Company.findByIdAndDelete(params.id)
+        
+        // Importar modelos para borrado en cascada
+        const [User, Category, Product, Customer, Supplier, Sale, Ticket] = await Promise.all([
+            import("@/lib/db/models/User").then(m => m.default),
+            import("@/lib/db/models/Category").then(m => m.default),
+            import("@/lib/db/models/Product").then(m => m.default),
+            import("@/lib/db/models/Customer").then(m => m.default),
+            import("@/lib/db/models/Supplier").then(m => m.default),
+            import("@/lib/db/models/Sale").then(m => m.default),
+            import("@/lib/db/models/Ticket").then(m => m.default)
+        ]);
+
+        // Borrar todos los documentos asociados a esta empresa
+        await Promise.all([
+            User.deleteMany({ companyId: params.id, role: { $ne: 'superadmin' } }),
+            Category.deleteMany({ companyId: params.id }),
+            Product.deleteMany({ companyId: params.id }),
+            Customer.deleteMany({ companyId: params.id }),
+            Supplier.deleteMany({ companyId: params.id }),
+            Sale.deleteMany({ companyId: params.id }),
+            Ticket.deleteMany({ companyId: params.id }),
+            Company.findByIdAndDelete(params.id)
+        ]);
+        
         return NextResponse.json({ success: true })
     } catch (error: any) {
         return NextResponse.json({ error: "Error al eliminar empresa" }, { status: 500 })
