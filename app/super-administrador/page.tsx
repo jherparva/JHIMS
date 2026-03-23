@@ -341,11 +341,11 @@ function CreateAdminModal({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
             <div
-                className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl"
+                className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col"
                 onClick={e => e.stopPropagation()}
             >
                 {/* Cabecera */}
-                <div className="flex items-center justify-between p-6 border-b border-slate-700">
+                <div className="flex items-center justify-between p-6 border-b border-slate-700 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-700 flex items-center justify-center">
                             <UserPlus className="h-6 w-6 text-white" />
@@ -355,13 +355,13 @@ function CreateAdminModal({
                             <p className="text-slate-400 text-sm">Asignar admin a una empresa</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors">
+                    <button type="button" onClick={onClose} className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors">
                         <X className="h-5 w-5 text-slate-400" />
                     </button>
                 </div>
 
                 {/* Formulario */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
                     {/* Empresa */}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
