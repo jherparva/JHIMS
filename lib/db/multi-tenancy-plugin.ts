@@ -2,7 +2,7 @@ import mongoose, { Schema } from 'mongoose'
 import { getSessionContext } from '../session-context'
 
 /**
- * Plugin de Mongoose para Multi-Tenancy (Blindado)
+ * Plugin de Mongoose para Multi-Tenancy (Blindado y Tipado para Vercel)
  */
 export function multiTenancyPlugin(schema: Schema) {
     // Solo aplicar el plugin si el schema tiene el campo companyId
@@ -21,14 +21,15 @@ export function multiTenancyPlugin(schema: Schema) {
             }
 
             const context = getSessionContext()
-            const modelName = this.model?.modelName || this.mongooseCollection?.name;
+            // Acceso seguro al nombre del modelo para evitar errores de compilación
+            const modelName = this.model ? this.model.modelName : (this.mongooseCollection ? this.mongooseCollection.name : 'Unknown');
             
             if (!context) {
                 const isGlobalModel = modelName === 'User' || modelName === 'Company' || 
                                      modelName === 'users' || modelName === 'companies';
                 if (isGlobalModel) return
 
-                console.warn(`⚠️ SEGURIDAD QUERY: Bloqueo en ${modelName || 'Unknown'} (Sin contexto)`)
+                console.warn(`⚠️ SEGURIDAD QUERY: Bloqueo en ${modelName} (Sin contexto)`)
                 this.where({ companyId: "000000000000000000000000" }) 
                 return
             }
@@ -53,21 +54,25 @@ export function multiTenancyPlugin(schema: Schema) {
     }
 
     /**
-     * Filtro para Agregaciones (aggregate) - CRÍTICO para reportes y dashboard
+     * Filtro para Agregaciones (aggregate)
      */
     const addCompanyIdFilterToAggregate = function(this: any) {
         try {
-            if (this.options && this.options.skipTenantFilter) {
+            const options = (this as any).options || {};
+            if (options.skipTenantFilter) {
                 return
             }
 
             const context = getSessionContext()
-            const modelName = this.model()?.modelName;
+            // Obtener el nombre del modelo de forma más robusta en agregaciones
+            const modelName = this._model ? this._model.modelName : 'Unknown';
             const matchStage: any = { companyId: null };
 
             if (!context) {
                 const isGlobalModel = modelName === 'User' || modelName === 'Company';
                 if (isGlobalModel) return;
+
+                console.warn(`⚠️ SEGURIDAD AGGREGATE: Bloqueo en ${modelName} (Sin contexto)`)
                 matchStage.companyId = "000000000000000000000000";
             } else if (context.role === 'superadmin') {
                 const isGlobalModel = modelName === 'User' || modelName === 'Ticket' || modelName === 'Company';
@@ -85,7 +90,7 @@ export function multiTenancyPlugin(schema: Schema) {
 
     // Registrar hooks
     schema.pre(/^(find|findOne|count|countDocuments|updateOne|updateMany|deleteOne|deleteMany)$/, addCompanyIdFilter)
-    schema.pre('aggregate', addCompanyIdFilterToAggregate)
+    schema.pre('aggregate', (addCompanyIdFilterToAggregate as any))
 
     schema.pre('save', function (next) {
         const context = getSessionContext()
