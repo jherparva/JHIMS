@@ -22,7 +22,7 @@ const ProductSchema = new Schema<IProduct>(
         companyId: {
             type: Schema.Types.ObjectId,
             ref: "Company",
-            required: false,
+            required: true,
             index: true,
         },
         sku: {
@@ -85,7 +85,7 @@ const ProductSchema = new Schema<IProduct>(
 )
 
 // Índices
-ProductSchema.index({ sku: 1 }, { unique: true })
+ProductSchema.index({ companyId: 1, sku: 1 }, { unique: true })
 ProductSchema.index({ name: "text" })
 ProductSchema.index({ category: 1 })
 ProductSchema.index({ stock: 1 })

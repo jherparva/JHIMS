@@ -18,7 +18,7 @@ const SupplierSchema = new Schema<ISupplier>(
         companyId: {
             type: Schema.Types.ObjectId,
             ref: "Company",
-            required: false,
+            required: true,
             index: true,
         },
         name: {

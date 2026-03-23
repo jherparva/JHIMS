@@ -31,11 +31,17 @@ export function multiTenancyPlugin(schema: Schema) {
             }
 
             const context = getSessionContext()
-
-            // Si no hay contexto, permitir la query sin filtro
+            
+            // Si NO hay contexto, POR SEGURIDAD bloqueamos la query para evitar fugas de datos.
+            // Esto es "Fail-Closed": si falla el contexto, no se muestra nada en lugar de todo.
             if (!context) {
+                console.warn('⚠️ MULTI-TENANCY: Query bloqueada (Sin contexto de sesión)')
+                this.where({ companyId: "000000000000" }) // ID imposible para inquilino
                 return
             }
+            
+            // Log de depuración para ver qué está filtrando
+            // console.log(`🔍 MULTI-TENANCY: Filtrando para ${context.role} (${context.companyId || 'Global'})`)
 
             // Superadmin puede acceder a datos de todas las empresas para modelos globales,
             // pero para inquilinos debe especificar el companyId.

@@ -4,11 +4,24 @@ import { AsyncLocalStorage } from 'async_hooks'
  * AsyncLocalStorage para mantener el contexto de la sesión a través de llamadas asíncronas
  * Esto permite que el plugin de Mongoose acceda al companyId sin pasarlo explícitamente
  */
-export const sessionContext = new AsyncLocalStorage<{
+// Singleton global para evitar múltiples instancias durante HMR en desarrollo
+declare global {
+    var globalSessionContext: AsyncLocalStorage<{
+        companyId?: string
+        userId?: string
+        role?: string
+    }> | undefined
+}
+
+export const sessionContext = global.globalSessionContext || new AsyncLocalStorage<{
     companyId?: string
     userId?: string
     role?: string
 }>()
+
+if (process.env.NODE_ENV !== 'production') {
+    global.globalSessionContext = sessionContext
+}
 
 /**
  * Helper para ejecutar código con contexto de sesión

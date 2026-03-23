@@ -17,7 +17,7 @@ const CustomerSchema = new Schema<ICustomer>(
         companyId: {
             type: Schema.Types.ObjectId,
             ref: "Company",
-            required: false,
+            required: true,
             index: true,
         },
         name: {
