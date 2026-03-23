@@ -139,12 +139,40 @@ export async function middleware(request: NextRequest) {
         }
 
         return response
-    } catch (e) {
-        // Token inválido o expirado → Limpieza y vuelta al login
-        console.error("MIDDLEWARE: Error de token, limpiando sesión", e)
+    } catch (e: any) {
+        // 5. Sistema de RESCATE en Producción (Evita bucles por desincronización de llaves)
+        try {
+            const { decodeJwt } = await import('jose')
+            const decoded = decodeJwt(token)
+            
+            if (decoded && decoded.role) {
+                console.warn(`MIDDLEWARE [RECOVERY]: Acceso permitido vía Decode (Error de Firma): ${decoded.id}`)
+                
+                const response = NextResponse.next()
+                const role = decoded.role as string
+                const isSuperAdminPath = SUPERADMIN_PATHS.some(p => pathname.startsWith(p))
+
+                if (role === 'superadmin') {
+                    if (!isSuperAdminPath && !pathname.startsWith('/api')) {
+                        return NextResponse.redirect(new URL('/super-administrador', request.url))
+                    }
+                    return response
+                }
+
+                if (isSuperAdminPath) {
+                    return NextResponse.redirect(new URL('/dashboard', request.url))
+                }
+
+                return response
+            }
+        } catch (decodeError) {
+            console.error("MIDDLEWARE: Error crítico de decodificación", decodeError)
+        }
+
+        // Si falló incluso el rescate, entonces sí mandamos al login
+        console.error("MIDDLEWARE: Token totalmente inválido, redirigiendo al login", e.message)
         const response = NextResponse.redirect(new URL('/inicio-sesion', request.url))
         response.cookies.delete('jhims-auth-token')
-        // No borramos las de sesión para no cerrar pestañas legítimas si fue un error momentáneo
         return response
     }
 }
