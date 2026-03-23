@@ -33,9 +33,17 @@ export function multiTenancyPlugin(schema: Schema) {
             const context = getSessionContext()
             
             // Si NO hay contexto, POR SEGURIDAD bloqueamos la query para evitar fugas de datos.
-            // Esto es "Fail-Closed": si falla el contexto, no se muestra nada en lugar de todo.
+            // Pero permitimos que el sistema se auto-consulte (User/Company) para poder autenticar.
             if (!context) {
-                console.warn('⚠️ MULTI-TENANCY: Query bloqueada (Sin contexto de sesión)')
+                const modelName = this.model?.modelName || this.mongooseCollection?.name;
+                const isAuthRelated = modelName === 'User' || modelName === 'Company' || 
+                                     modelName === 'users' || modelName === 'companies';
+
+                if (isAuthRelated || (this.getOptions && this.getOptions().skipTenantFilter)) {
+                    return
+                }
+
+                console.warn(`⚠️ MULTI-TENANCY: Query bloqueada (Sin contexto): ${modelName || 'Unknown'}`)
                 // Filtrar por un ID imposible de 24 carácteres hexadecimales para evitar errores de cast
                 this.where({ companyId: "000000000000000000000000" }) 
                 return
