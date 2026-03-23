@@ -102,11 +102,9 @@ export async function POST(req: NextRequest) {
         })
 
         // Establecer cookie de sesión de navegador para evitar bucles
-        const browserSessionId = Math.random().toString(36).substring(2, 15) + 
-                               Math.random().toString(36).substring(2, 15)
+        const browserSessionId = Math.random().toString(36).substring(2, 15)
+        const sessionCookieName = `jhims-session-${user._id.toString().substring(0, 8)}`
         
-        // No especificamos dominio para que las cookies funcionen en cualquier host (incluido Vercel)
-        const sessionCookieName = `jhims-session-${user._id.toString().substring(0, 8)}` // Cookie única por usuario
         response.cookies.set(sessionCookieName, browserSessionId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
@@ -116,17 +114,14 @@ export async function POST(req: NextRequest) {
         })
 
         // Establecer ID único de ventana para aislar sesiones
-        const windowId = 'win_' + Math.random().toString(36).substring(2, 15) + 
-                       Math.random().toString(36).substring(2, 15) + 
-                       '_' + Date.now()
-        
-        const windowCookieName = `jhims-window-${user._id.toString().substring(0, 8)}` // Cookie única por usuario para ventana
+        const windowId = 'win_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now()
+        const windowCookieName = `jhims-window-${user._id.toString().substring(0, 8)}`
         
         response.cookies.set(windowCookieName, windowId, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
-            maxAge: 60 * 60 * 24, // 24 horas
+            maxAge: 60 * 60 * 24,
             path: "/",
         })
 
