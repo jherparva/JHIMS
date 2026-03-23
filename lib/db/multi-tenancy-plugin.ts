@@ -39,12 +39,14 @@ export function multiTenancyPlugin(schema: Schema) {
                 const isAuthRelated = modelName === 'User' || modelName === 'Company' || 
                                      modelName === 'users' || modelName === 'companies';
 
-                if (isAuthRelated || (this.getOptions && this.getOptions().skipTenantFilter)) {
+                // Si es una consulta técnica del sistema (User/Company) y NO hay contexto, permitimos para el login.
+                // PERO, si es de negocio (Producto, Cliente, etc.), BLOQUEAMOS ABSOLUTAMENTE si no hay contexto.
+                if (isAuthRelated && (this.getOptions && this.getOptions().skipTenantFilter)) {
                     return
                 }
 
-                console.warn(`⚠️ MULTI-TENANCY: Query bloqueada (Sin contexto): ${modelName || 'Unknown'}`)
-                // Filtrar por un ID imposible de 24 carácteres hexadecimales para evitar errores de cast
+                console.warn(`⚠️ MULTI-TENANCY CRÍTIC [Fail-Closed]: Query bloqueada por falta de contexto en ${modelName || 'Unknown'}`)
+                // Filtrar por un ID imposible de 24 carácteres para asegurar que no devuelve nada de otros inquilinos
                 this.where({ companyId: "000000000000000000000000" }) 
                 return
             }

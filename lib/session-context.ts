@@ -19,9 +19,8 @@ export const sessionContext = global.globalSessionContext || new AsyncLocalStora
     role?: string
 }>()
 
-if (process.env.NODE_ENV !== 'production') {
-    global.globalSessionContext = sessionContext
-}
+// Asignar SIEMPRE al global para evitar múltiples instancias en Next.js (común en Vercel)
+global.globalSessionContext = sessionContext
 
 /**
  * Helper para ejecutar código con contexto de sesión
