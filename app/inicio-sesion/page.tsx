@@ -127,10 +127,12 @@ function LoginContent() {
 
       toast.success(`Bienvenido ${data.user.fullName}`)
 
-      // Redirigir según el rol
-      // Redirigir siempre al panel de control
-      // Usamos window.location para asegurar un refresh completo y que el middleware detecte la cookie
-      window.location.href = "/dashboard"
+      // Redirigir según el rol de forma inmediata para evitar bucles de middleware
+      if (data.user.role === "superadmin") {
+        window.location.href = "/super-administrador"
+      } else {
+        window.location.href = "/dashboard"
+      }
     } catch (error) {
       console.error("Error:", error)
       toast.error((error as any).message || "Error de conexión. Intenta de nuevo")
