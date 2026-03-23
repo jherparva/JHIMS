@@ -199,6 +199,74 @@ function ActionModal({
                         </div>
                     </div>
 
+                    {/* ── SECCIÓN: Inventario Masivo ── */}
+                    <div className="border border-indigo-900/50 rounded-xl p-4 bg-indigo-950/20">
+                        <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                            <TrendingUp className="h-3.5 w-3.5" /> Inventario Inteligente (Excel)
+                        </p>
+                        
+                        <div className="space-y-3">
+                            <p className="text-[10px] text-slate-400 italic">
+                                * Sustituye el inventario actual. Autodetecta categorías y genera SKUs faltantes.
+                            </p>
+                            
+                            <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-700 border-dashed rounded-xl cursor-pointer bg-slate-800/20 hover:bg-slate-800/40 transition-all group overflow-hidden relative">
+                                {isInitializing ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <RefreshCw className="h-6 w-6 text-indigo-400 animate-spin" />
+                                        <span className="text-xs text-indigo-300 font-medium">Procesando...</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-1">
+                                        <Globe className="h-6 w-6 text-slate-500 group-hover:text-indigo-400 transition-colors" />
+                                        <span className="text-xs text-slate-400 group-hover:text-indigo-300">Seleccionar Excel (.xlsx)</span>
+                                    </div>
+                                )}
+                                <input 
+                                    type="file" 
+                                    className="hidden" 
+                                    accept=".xlsx, .xls"
+                                    disabled={isInitializing}
+                                    onChange={async (e) => {
+                                        const file = e.target.files?.[0]
+                                        if (!file) return
+
+                                        if (!confirm("¿Seguro que quieres importar este inventario? Esto ELIMINARÁ y REEMPLAZARÁ todos los productos actuales de esta empresa.")) {
+                                            e.target.value = ''
+                                            return
+                                        }
+
+                                        setIsInitializing(true)
+                                        const formData = new FormData()
+                                        formData.append('file', file)
+
+                                        try {
+                                            const res = await fetch(`/api/super-administrador/empresas/${company._id}/inventario`, {
+                                                method: 'POST',
+                                                body: formData
+                                            })
+
+                                            if (res.ok) {
+                                                const data = await res.json()
+                                                toast.success(data.message)
+                                                // Recargar datos si es necesario
+                                                onClose()
+                                            } else {
+                                                const error = await res.json()
+                                                toast.error(error.error || "Error al importar")
+                                            }
+                                        } catch {
+                                            toast.error("Error de conexión")
+                                        } finally {
+                                            setIsInitializing(false)
+                                            e.target.value = ''
+                                        }
+                                    }}
+                                />
+                            </label>
+                        </div>
+                    </div>
+
                     {/* ── SECCIÓN: Zona de peligro ── */}
                     <div className="border border-red-900/50 rounded-xl p-4 bg-red-950/20">
                         <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
