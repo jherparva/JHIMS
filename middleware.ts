@@ -76,104 +76,63 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL(rutaEspanol, request.url), { status: 301 })
     }
 
-    // Permitir rutas públicas
+    // Permitir rutas públicas permanentemente
     const isPublicPath = PUBLIC_PATHS.some(path => pathname.startsWith(path))
     if (isPublicPath) {
         return NextResponse.next()
     }
 
-    // Verificar que existe el token de sesión
+    // 1. Obtención del token
     const token = request.cookies.get('jhims-auth-token')?.value
     if (!token) {
+        // Si no hay token en absoluto, mandamos al login
         return NextResponse.redirect(new URL('/inicio-sesion', request.url))
     }
 
-    // PRIORIDAD 1: Detectar si es una nueva ventana/pestaña del navegador
-    // Solo aplicamos esto si NO es una ruta de inicio de sesión y no hay tokens conocidos.
-    if (!pathname.startsWith('/inicio-sesion') && isNewWindowSession(request)) {
-        console.log("MIDDLEWARE: Nueva ventana detectada, redirigiendo a login para seguridad")
-        const response = NextResponse.redirect(new URL('/inicio-sesion?session=new', request.url))
-        return response
-    }
-
     try {
-        // Verificar y decodificar el token JWT
+        // 2. Verificación de identidad inmediata
         const { payload } = await jwtVerify(token, JWT_SECRET)
         const role = payload.role as string
+        const userId = payload.id as string
 
-        // Establecer cookie de sesión de navegador si no existe (mantener sesión activa)
+        // 3. Sistema de sesión robusto (Post-Autenticación)
+        // En lugar de redirigir, si el token es válido permitimos el paso
+        // y opcionalmente regeneramos los indicadores de sesión si faltan.
         const response = NextResponse.next()
         
-        // Obtener el ID de usuario del token para crear cookie única por sesión
-        const userId = payload.id as string
-        const windowCookieName = `jhims-window-${userId.substring(0, 8)}` // Cookie única por usuario
-        
-        // Obtener windowId actual de la cookie específica de esta sesión
+        // Verificación opcional de ID de ventana (informativo en producción para no bloquear)
+        const windowCookieName = `jhims-window-${userId.substring(0, 8)}`
         let windowId = request.cookies.get(windowCookieName)?.value
         
-        // Si no hay windowId, generar uno nuevo SIEMPRE (aislamiento completo por sesión)
-        if (!windowId) {
+        if (!windowId && !pathname.startsWith('/api')) {
             windowId = generateWindowId()
-            
-            // Usar cookie única por sesión (basada en ID de usuario)
-            // No especificamos dominio para que las cookies funcionen en cualquier host (incluido Vercel)
             response.cookies.set(windowCookieName, windowId, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === "production",
                 sameSite: "lax",
-                maxAge: 60 * 60 * 24, // 24 horas
+                maxAge: 60 * 60 * 24,
                 path: "/",
             })
-            console.log(`MIDDLEWARE: Nuevo windowId asignado: ${windowId} para ruta: ${pathname} (cookie: ${windowCookieName})`)
-        } else {
-            // Mantener windowId existente - no reemplazar innecesariamente
-            console.log(`MIDDLEWARE: windowId existente: ${windowId} para ruta: ${pathname} (cookie: ${windowCookieName})`)
+            console.log(`MIDDLEWARE [INFO]: Recuperando windowId para usuario autenticado: ${userId}`)
         }
 
-        // PRIORIDAD 2: Verificación estado de empresa (solución temporal segura)
-        // Usando cache en memoria para evitar problemas con referencias a User
-        if (role !== 'superadmin' && payload.companyId) {
-            try {
-                // Cache simple en memoria para empresas (en producción usar Redis)
-                const suspendedCompanies = new Set<string>() // Podría cargarse desde una configuración
-                
-                // Por ahora, permitir acceso y registrar para auditoría
-                // TODO: Implementar cache real de empresas suspendidas
-                console.log(` MIDDLEWARE: Verificando empresa ${payload.companyId} (usuario: ${role})`)
-                console.log(`ℹ️ MIDDLEWARE: Verificación de estado desactivada temporalmente por seguridad`)
-                
-                // En lugar de bloquear, registramos el acceso para auditoría
-                console.log(`🔍 AUDITORÍA: Acceso permitido a empresa ${payload.companyId} por usuario ${role}`)
-                
-            } catch (error) {
-                console.error("MIDDLEWARE: Error en verificación simplificada:", error)
-                // No bloquear por ahora para mantener el sistema funcionando
-            }
-        }
-
-        // PRIORIDAD 3: Lógica de redirección por rol (solo si no es nueva ventana)
-        // Superadmin solo puede estar en /superadmin
+        // 4. Lógica de acceso por Rol
         const isSuperAdminPath = SUPERADMIN_PATHS.some(p => pathname.startsWith(p))
-        const isNewWindow = isNewWindowSession(request)
-        
-        console.log(`MIDDLEWARE: role=${role}, pathname=${pathname}, isSuperAdminPath=${isSuperAdminPath}, isNewWindow=${isNewWindow}`)
         
         if (role === 'superadmin') {
-            // El superadmin SIEMPRE debe estar en /superadmin
+            // El superadmin debe estar en su panel, o en las APIs
             if (!isSuperAdminPath && !pathname.startsWith('/api')) {
-                console.log("MIDDLEWARE: Superadmin fuera de su panel, redirigiendo a /super-administrador")
                 return NextResponse.redirect(new URL('/super-administrador', request.url))
             }
             return response
         }
 
-        // Usuario normal (admin/seller) no puede acceder al panel de superadmin
+        // Restricción de acceso a panel superadmin para otros roles
         if (isSuperAdminPath) {
-            console.log(`MIDDLEWARE: Usuario ${role} intentando acceder a superadmin, redirigiendo a dashboard`)
             return NextResponse.redirect(new URL('/dashboard', request.url))
         }
 
-        // Verificar acceso a rutas exclusivas del admin de empresa
+        // Verificación acceso a rutas exclusivas del admin de empresa
         const isAdminOnlyPath = ADMIN_ONLY_PATHS.some(path => pathname.startsWith(path))
         if (isAdminOnlyPath && role !== 'admin' && role !== 'superadmin') {
             return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
@@ -181,10 +140,11 @@ export async function middleware(request: NextRequest) {
 
         return response
     } catch (e) {
-        // Token inválido → redirigir al login
+        // Token inválido o expirado → Limpieza y vuelta al login
+        console.error("MIDDLEWARE: Error de token, limpiando sesión", e)
         const response = NextResponse.redirect(new URL('/inicio-sesion', request.url))
         response.cookies.delete('jhims-auth-token')
-        response.cookies.delete('jhims-browser-session')
+        // No borramos las de sesión para no cerrar pestañas legítimas si fue un error momentáneo
         return response
     }
 }
