@@ -3,8 +3,8 @@ import { connectDB } from "@/lib/db/mongodb"
 import Company from "@/lib/db/models/Company"
 import Category from "@/lib/db/models/Category"
 import { getSession } from "@/lib/auth"
-
 import Product from "@/lib/db/models/Product"
+import { runWithSession } from "@/lib/session-context"
 
 const DEFAULT_CATEGORIES: Record<string, string[]> = {
     tienda: [
@@ -123,107 +123,130 @@ export async function PATCH(
         return NextResponse.json({ error: "Acceso denegado. Solo superadmin." }, { status: 403 })
     }
 
-    try {
-        await connectDB()
-        const { status, plan, businessType, initCategories } = await req.json()
+    // Usar runWithSession para que el plugin de multi-tenancy no bloquee las consultas del superadmin
+    return runWithSession({ role: 'superadmin', userId: user.id }, async () => {
+        try {
+            await connectDB()
+            const { status, plan, businessType, initCategories } = await req.json()
 
-        const company = await Company.findById(params.id)
-        if (!company) {
-            return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
-        }
-
-        if (status) company.status = status
-        if (businessType) company.businessType = businessType
-        
-        if (plan && plan !== company.plan) {
-            company.plan = plan
-            // Actualizar límites automáticos según el nuevo plan
-            const { PLANS } = await import("@/lib/db/models/Company")
-            const planConfig = PLANS[plan]
-            if (planConfig) {
-                company.limits = planConfig.limits
-            }
-        }
-
-        await company.save()
-
-        // Lógica de generación manual de categorías
-        if (initCategories) {
-            const bType = businessType || company.businessType || 'tienda'
-            const defaultCats = DEFAULT_CATEGORIES[bType] || DEFAULT_CATEGORIES.tienda
-            
-            // Verificamos cuáles ya existen para evitar error de índice
-            const existingCats = await Category.find({ 
-                companyId: params.id,
-                name: { $in: defaultCats }
-            }).select('name')
-            
-            const existingNames = existingCats.map(c => c.name)
-            const catsToInsert = defaultCats.filter(name => !existingNames.includes(name))
-            
-            if (catsToInsert.length > 0) {
-                await Category.insertMany(
-                    catsToInsert.map(catName => ({
-                        companyId: params.id,
-                        name: catName,
-                        description: `Generado automáticamente - ${bType}`,
-                        isActive: true
-                    }))
-                )
+            const company = await Company.findById(params.id)
+            if (!company) {
+                return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
             }
 
-            // Mapear todas las categorías (las nuevas y las existentes)
-            const allCats = await Category.find({ 
-                companyId: params.id,
-                name: { $in: defaultCats }
-            }).select('name _id')
-
-            const catMap = allCats.reduce((acc, cat) => {
-                acc[cat.name] = cat._id
-                return acc
-            }, {} as Record<string, any>)
-
-            // CREAR INVENTARIO POR DEFECTO
-            const defaultProds = DEFAULT_PRODUCTS[bType] || DEFAULT_PRODUCTS.tienda
+            if (status) company.status = status
+            if (businessType) {
+                company.businessType = businessType
+            }
             
-            // Verificar qué productos ya existen para no duplicar
-            const existingProds = await Product.find({
-                companyId: params.id,
-                name: { $in: defaultProds.map(p => p.name) }
-            }).select('name')
-            
-            const existingProdNames = existingProds.map(p => p.name)
-            const prodsToInsert = defaultProds.filter(prod => !existingProdNames.includes(prod.name))
+            if (plan && plan !== company.plan) {
+                company.plan = plan
+                // Actualizar límites automáticos según el nuevo plan
+                const { PLANS } = await import("@/lib/db/models/Company")
+                const planConfig = PLANS[plan]
+                if (planConfig) {
+                    company.limits = planConfig.limits
+                }
+            }
 
-            if (prodsToInsert.length > 0) {
-                let skuCounter = 1;
-                const newProducts = prodsToInsert.map(prod => {
-                    const catId = catMap[prod.cat] || allCats[0]?._id
-                    const paddedSku = skuCounter.toString().padStart(4, '0')
-                    skuCounter++
-                    
-                    return {
-                        companyId: params.id,
-                        name: prod.name,
-                        sku: `SKU-${bType.substring(0,3).toUpperCase()}-${Date.now().toString().substring(7)}-${paddedSku}`, // SKU único
-                        category: catId,
-                        purchasePrice: 0,
-                        salePrice: 0,
-                        stock: 0,
-                        minStock: 5,
-                        isActive: true
-                    }
-                })
+            await company.save()
+
+            // Lógica de generación manual de categorías
+            if (initCategories) {
+                const bType = businessType || company.businessType || 'tienda'
+                const defaultCats = DEFAULT_CATEGORIES[bType] || DEFAULT_CATEGORIES.tienda
                 
-                await Product.insertMany(newProducts)
-            }
-        }
+                // ELIMINAR CATEGORÍAS Y PRODUCTOS PREVIAMENTE GENERADOS AUTOMÁTICAMENTE
+                // Esto cumple con el requerimiento de "si se cambia de tienda a ferretería también se cambiarán todo lo que se genera automáticamente"
+                await Product.deleteMany({ 
+                    companyId: params.id, 
+                    description: { $regex: /^Generado automáticamente/ } 
+                })
+                await Category.deleteMany({ 
+                    companyId: params.id, 
+                    description: { $regex: /^Generado automáticamente/ } 
+                })
 
-        return NextResponse.json({ success: true, company })
-    } catch (error: any) {
-        console.error("UPDATE COMPANY ERROR:", error)
-        return NextResponse.json({ error: "Error al actualizar empresa" }, { status: 500 })
-    }
+                // Verificamos cuáles ya existen (en caso de que el usuario haya creado manualmente algunas con el mismo nombre)
+                const existingCats = await Category.find({ 
+                    companyId: params.id,
+                    name: { $in: defaultCats }
+                }).select('name')
+                
+                const existingNames = existingCats.map(c => c.name)
+                const catsToInsert = defaultCats.filter(name => !existingNames.includes(name))
+                
+                if (catsToInsert.length > 0) {
+                    await Category.insertMany(
+                        catsToInsert.map(catName => ({
+                            companyId: params.id,
+                            name: catName,
+                            description: `Generado automáticamente - ${bType}`,
+                            isActive: true
+                        }))
+                    )
+                }
+
+                // Mapear todas las categorías (las nuevas y las existentes)
+                const allCats = await Category.find({ 
+                    companyId: params.id,
+                    name: { $in: defaultCats }
+                }).select('name _id')
+
+                const catMap = allCats.reduce((acc, cat) => {
+                    acc[cat.name] = cat._id
+                    return acc
+                }, {} as Record<string, any>)
+
+                // CREAR INVENTARIO POR DEFECTO
+                const defaultProds = DEFAULT_PRODUCTS[bType] || DEFAULT_PRODUCTS.tienda
+                
+                // Verificar qué productos ya existen para no duplicar (por nombre)
+                const existingProds = await Product.find({
+                    companyId: params.id,
+                    name: { $in: defaultProds.map(p => p.name) }
+                }).select('name')
+                
+                const existingProdNames = existingProds.map(p => p.name)
+                const prodsToInsert = defaultProds.filter(prod => !existingProdNames.includes(prod.name))
+
+                if (prodsToInsert.length > 0) {
+                    let skuCounter = 1;
+                    const newProducts = prodsToInsert.map(prod => {
+                        const catId = catMap[prod.cat] || (allCats.length > 0 ? allCats[0]._id : null)
+                        
+                        // Si por algún motivo no hay categorías, no podemos insertar productos (ya que la categoría es requerida)
+                        if (!catId) return null;
+
+                        const paddedSku = skuCounter.toString().padStart(4, '0')
+                        skuCounter++
+                        
+                        return {
+                            companyId: params.id,
+                            name: prod.name,
+                            description: `Generado automáticamente - ${bType}`,
+                            sku: `SKU-${bType.substring(0,3).toUpperCase()}-${Date.now().toString().substring(7)}-${paddedSku}`, 
+                            category: catId,
+                            purchasePrice: 0,
+                            salePrice: 0,
+                            stock: 0,
+                            minStock: 5,
+                            isActive: true
+                        }
+                    }).filter(p => p !== null)
+                    
+                    if (newProducts.length > 0) {
+                        await Product.insertMany(newProducts)
+                    }
+                }
+            }
+
+            return NextResponse.json({ success: true, company })
+        } catch (error: any) {
+            console.error("UPDATE COMPANY ERROR:", error)
+            return NextResponse.json({ error: "Error al actualizar empresa: " + error.message }, { status: 500 })
+        }
+    })
 }
 
 // DELETE: Eliminar empresa (irreversible)
@@ -236,34 +259,38 @@ export async function DELETE(
         return NextResponse.json({ error: "Acceso denegado. Solo superadmin." }, { status: 403 })
     }
 
-    try {
-        await connectDB()
-        
-        // Importar modelos para borrado en cascada
-        const [User, Category, Product, Customer, Supplier, Sale, Ticket] = await Promise.all([
-            import("@/lib/db/models/User").then(m => m.default),
-            import("@/lib/db/models/Category").then(m => m.default),
-            import("@/lib/db/models/Product").then(m => m.default),
-            import("@/lib/db/models/Customer").then(m => m.default),
-            import("@/lib/db/models/Supplier").then(m => m.default),
-            import("@/lib/db/models/Sale").then(m => m.default),
-            import("@/lib/db/models/Ticket").then(m => m.default)
-        ]);
+    return runWithSession({ role: 'superadmin', userId: user.id }, async () => {
+        try {
+            await connectDB()
+            
+            // Importar modelos para borrado en cascada
+            const [UserModel, CategoryModel, ProductModel, CustomerModel, SupplierModel, SaleModel, TicketModel] = await Promise.all([
+                import("@/lib/db/models/User").then(m => m.default),
+                import("@/lib/db/models/Category").then(m => m.default),
+                import("@/lib/db/models/Product").then(m => m.default),
+                import("@/lib/db/models/Customer").then(m => m.default),
+                import("@/lib/db/models/Supplier").then(m => m.default),
+                import("@/lib/db/models/Sale").then(m => m.default),
+                import("@/lib/db/models/Ticket").then(m => m.default)
+            ]);
 
-        // Borrar todos los documentos asociados a esta empresa
-        await Promise.all([
-            User.deleteMany({ companyId: params.id, role: { $ne: 'superadmin' } }),
-            Category.deleteMany({ companyId: params.id }),
-            Product.deleteMany({ companyId: params.id }),
-            Customer.deleteMany({ companyId: params.id }),
-            Supplier.deleteMany({ companyId: params.id }),
-            Sale.deleteMany({ companyId: params.id }),
-            Ticket.deleteMany({ companyId: params.id }),
-            Company.findByIdAndDelete(params.id)
-        ]);
-        
-        return NextResponse.json({ success: true })
-    } catch (error: any) {
-        return NextResponse.json({ error: "Error al eliminar empresa" }, { status: 500 })
-    }
+            // Borrar todos los documentos asociados a esta empresa
+            // Nota: El plugin de multi-tenancy podría bloquear estos deleteMany si no hay contexto
+            await Promise.all([
+                UserModel.deleteMany({ companyId: params.id, role: { $ne: 'superadmin' } }),
+                CategoryModel.deleteMany({ companyId: params.id }),
+                ProductModel.deleteMany({ companyId: params.id }),
+                CustomerModel.deleteMany({ companyId: params.id }),
+                SupplierModel.deleteMany({ companyId: params.id }),
+                SaleModel.deleteMany({ companyId: params.id }),
+                TicketModel.deleteMany({ companyId: params.id }),
+                Company.findByIdAndDelete(params.id)
+            ]);
+            
+            return NextResponse.json({ success: true })
+        } catch (error: any) {
+            console.error("DELETE COMPANY ERROR:", error)
+            return NextResponse.json({ error: "Error al eliminar empresa: " + error.message }, { status: 500 })
+        }
+    })
 }

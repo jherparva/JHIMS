@@ -7,6 +7,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
     title: "JHIMS Inventory V2",
     description: "Sistema de Gestión de Inventario",
+    icons: {
+        icon: '/icon.png',
+        shortcut: '/icon.png',
+        apple: '/icon.png',
+    }
 };
 
 import { ThemeProvider } from "@/components/theme-provider";

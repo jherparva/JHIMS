@@ -146,7 +146,7 @@ function LoginContent() {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020617] transition-colors duration-1000"> {/* Fondo oscuro premium */}
         <div className="flex flex-col items-center animate-in fade-in duration-1000">
-          <Logo size="xl" className="h-[350px] w-auto drop-shadow-2xl" animated={true} />
+          <Logo size="xl" variant="full" className="h-auto w-auto drop-shadow-2xl" animated={true} />
         </div>
       </div>
     )
