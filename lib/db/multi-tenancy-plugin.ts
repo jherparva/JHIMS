@@ -36,17 +36,18 @@ export function multiTenancyPlugin(schema: Schema) {
             // Pero permitimos que el sistema se auto-consulte (User/Company) para poder autenticar.
             if (!context) {
                 const modelName = this.model?.modelName || this.mongooseCollection?.name;
-                const isAuthRelated = modelName === 'User' || modelName === 'Company' || 
+                
+                // LISTA BLANCA: Modelos globales que NO deben bloquearse si falla el contexto (necesarios para login)
+                const isGlobalModel = modelName === 'User' || modelName === 'Company' || 
                                      modelName === 'users' || modelName === 'companies';
 
-                // Si es una consulta técnica del sistema (User/Company) y NO hay contexto, permitimos para el login.
-                // PERO, si es de negocio (Producto, Cliente, etc.), BLOQUEAMOS ABSOLUTAMENTE si no hay contexto.
-                if (isAuthRelated && (this.getOptions && this.getOptions().skipTenantFilter)) {
+                // Permitir si es modelo global O si se pidió explícitamente saltar el filtro
+                if (isGlobalModel || (this.getOptions && this.getOptions().skipTenantFilter)) {
                     return
                 }
 
-                console.warn(`⚠️ MULTI-TENANCY CRÍTIC [Fail-Closed]: Query bloqueada por falta de contexto en ${modelName || 'Unknown'}`)
-                // Filtrar por un ID imposible de 24 carácteres para asegurar que no devuelve nada de otros inquilinos
+                // BLOQUEO TOTAL: Para modelos de inquilinos (Productos, Clientes, etc.) si no hay contexto
+                console.warn(`⚠️ SEGURIDAD: Bloqueo multitenant en ${modelName || 'Unknown'} por falta de contexto`)
                 this.where({ companyId: "000000000000000000000000" }) 
                 return
             }
