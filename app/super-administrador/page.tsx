@@ -69,8 +69,8 @@ function ActionModal({
     const [isInitializing, setIsInitializing] = useState(false)
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
             <div
                 className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md"
                 onClick={e => e.stopPropagation()}
@@ -338,8 +338,9 @@ function CreateAdminModal({
     const companiesWithAdmin = companies.filter(c => c.adminUser)
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            {/* Se pone el onClick SOLO en el fondo para evitar que clics erróneos en el menú de autocompletado lo cierren */}
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
             <div
                 className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] flex flex-col"
                 onClick={e => e.stopPropagation()}
@@ -361,7 +362,7 @@ function CreateAdminModal({
                 </div>
 
                 {/* Formulario */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto" autoComplete="off">
                     {/* Empresa */}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -436,21 +437,27 @@ function CreateAdminModal({
                                 <div>
                                     <input
                                         type="text"
+                                        id="newCompanyNameInput"
+                                        name="new_company_name_admin"
                                         value={formData.newCompanyName}
                                         onChange={(e) => setFormData({ ...formData, newCompanyName: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                         placeholder="Nombre de la nueva empresa*"
                                         required={formData.createNewCompany}
+                                        autoComplete="off"
                                     />
                                 </div>
                                 <div>
                                     <input
                                         type="email"
+                                        id="newCompanyEmailInput"
+                                        name="new_company_email_admin"
                                         value={formData.newCompanyEmail}
                                         onChange={(e) => setFormData({ ...formData, newCompanyEmail: e.target.value })}
                                         className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                         placeholder="Email de la empresa*"
                                         required={formData.createNewCompany}
+                                        autoComplete="off"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 gap-3">
@@ -483,11 +490,14 @@ function CreateAdminModal({
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
+                                id="adminUserFullName"
+                                name="admin_user_full_name_new"
                                 value={formData.fullName}
                                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                 placeholder="Juan Pérez"
                                 required
+                                autoComplete="new-password"
                             />
                         </div>
                     </div>
@@ -501,11 +511,14 @@ function CreateAdminModal({
                             <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="text"
+                                id="adminUsername"
+                                name="admin_username_new"
                                 value={formData.username}
                                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                 placeholder="juanperez"
                                 required
+                                autoComplete="new-password"
                             />
                         </div>
                     </div>
@@ -513,36 +526,49 @@ function CreateAdminModal({
                     {/* Email */}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Correo electrónico *
+                            Correo electrónico del Administrador*
                         </label>
                         <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="email"
+                                id="adminUserEmail"
+                                name="admin_user_email_new"
                                 value={formData.email}
                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                 placeholder="admin@empresa.com"
                                 required
+                                autoComplete="new-password"
                             />
                         </div>
+                    </div>
+
+                    {/* Hack oculto mejorado para detener el autocompletado */}
+                    <div style={{ display: 'none', opacity: 0, position: 'absolute', top: '-9999px', left: '-9999px' }}>
+                        <input type="text" name="prevent_autofill_username" tabIndex={-1} autoComplete="username" />
+                        <input type="email" name="prevent_autofill_email" tabIndex={-1} autoComplete="email" />
+                        <input type="password" name="prevent_autofill_password" tabIndex={-1} autoComplete="current-password" />
                     </div>
 
                     {/* Contraseña */}
                     <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Contraseña *
+                            Contraseña del Administrador*
                         </label>
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="password"
+                                id="adminUserPassword"
+                                name="admin_user_password_new"
                                 value={formData.password}
                                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                 placeholder="Mínimo 6 caracteres"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                             />
                         </div>
                     </div>
@@ -556,12 +582,15 @@ function CreateAdminModal({
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             <input
                                 type="password"
+                                id="adminUserConfirmPassword"
+                                name="admin_user_confirm_password_new"
                                 value={formData.confirmPassword}
                                 onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                 className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                                 placeholder="Repetir contraseña"
                                 required
                                 minLength={6}
+                                autoComplete="new-password"
                             />
                         </div>
                     </div>
@@ -738,8 +767,8 @@ function EditUsersModal({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
             <div
                 className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden"
                 onClick={e => e.stopPropagation()}
@@ -927,8 +956,8 @@ function EditUsersModal({
             }
 
             return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
                     <div
                         className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md"
                         onClick={e => e.stopPropagation()}
@@ -941,11 +970,14 @@ function EditUsersModal({
                                     <label className="block text-sm font-medium text-slate-300 mb-1">Nombre completo</label>
                                     <input
                                         type="text"
+                                        id="sellerFullName"
+                                        name="seller_full_name_unique"
                                         value={formData.fullName}
                                         onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Juan Pérez"
                                         required
+                                        autoComplete="new-password"
                                     />
                                 </div>
                                 
@@ -953,11 +985,14 @@ function EditUsersModal({
                                     <label className="block text-sm font-medium text-slate-300 mb-1">Usuario</label>
                                     <input
                                         type="text"
+                                        id="sellerUsername"
+                                        name="seller_username_unique"
                                         value={formData.username}
                                         onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="juanperez"
                                         required
+                                        autoComplete="new-password"
                                     />
                                 </div>
                                 
@@ -965,11 +1000,14 @@ function EditUsersModal({
                                     <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
                                     <input
                                         type="email"
+                                        id="sellerEmail"
+                                        name="seller_email_unique"
                                         value={formData.email}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="vendedor@empresa.com"
                                         required
+                                        autoComplete="new-password"
                                     />
                                 </div>
                                 
@@ -977,12 +1015,15 @@ function EditUsersModal({
                                     <label className="block text-sm font-medium text-slate-300 mb-1">Contraseña</label>
                                     <input
                                         type="password"
+                                        id="sellerPassword"
+                                        name="seller_password_unique"
                                         value={formData.password}
                                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Mínimo 6 caracteres"
                                         required
                                         minLength={6}
+                                        autoComplete="new-password"
                                     />
                                 </div>
                                 
@@ -990,12 +1031,15 @@ function EditUsersModal({
                                     <label className="block text-sm font-medium text-slate-300 mb-1">Confirmar contraseña</label>
                                     <input
                                         type="password"
+                                        id="sellerConfirmPassword"
+                                        name="seller_confirm_password_unique"
                                         value={formData.confirmPassword}
                                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         placeholder="Repetir contraseña"
                                         required
                                         minLength={6}
+                                        autoComplete="new-password"
                                     />
                                 </div>
                                 
