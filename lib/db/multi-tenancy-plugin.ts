@@ -36,7 +36,8 @@ export function multiTenancyPlugin(schema: Schema) {
             // Esto es "Fail-Closed": si falla el contexto, no se muestra nada en lugar de todo.
             if (!context) {
                 console.warn('⚠️ MULTI-TENANCY: Query bloqueada (Sin contexto de sesión)')
-                this.where({ companyId: "000000000000" }) // ID imposible para inquilino
+                // Filtrar por un ID imposible de 24 carácteres hexadecimales para evitar errores de cast
+                this.where({ companyId: "000000000000000000000000" }) 
                 return
             }
             
