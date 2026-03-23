@@ -140,8 +140,7 @@ export function Header({ user }: HeaderProps) {
           <h1 className="text-2xl font-semibold tracking-tight text-primary flex items-center gap-3">
             {isVisualMode ? (
               <>
-                <Logo size="small" iconOnly={true} className="h-8 w-auto drop-shadow-sm" />
-                <span className="font-mono text-xl tracking-tight select-none">JHIMS</span>
+                <Logo size="xs" layout="horizontal" variant="full" animated={false} dark={true} showTagline={false} />
               </>
             ) : "Panel de Control"}
           </h1>

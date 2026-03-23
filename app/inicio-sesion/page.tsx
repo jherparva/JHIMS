@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/dialog"
 import { Package, ShoppingCart, BarChart3, Users, HelpCircle, Info, Sparkles, DollarSign } from "lucide-react"
 import { Suspense } from "react"
+import { cn } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
 
 function LoginContent() {
   const router = useRouter()
@@ -141,34 +143,68 @@ function LoginContent() {
     }
   }
 
-  // Renderizar Splash Screen
-  if (showSplash) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#020617] transition-colors duration-1000"> {/* Fondo oscuro premium */}
-        <div className="flex flex-col items-center animate-in fade-in duration-1000">
-          <Logo size="xl" variant="full" className="h-auto w-auto drop-shadow-2xl" animated={true} />
-        </div>
-      </div>
-    )
-  }
-
-  // Renderizar Login (sin animación en el logo)
+  // Renderizar Login con Splash Screen cinematogrfico integrado
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#020617] to-[#0f172a] animate-in fade-in duration-700">
-      {/* Panel izquierdo con diseño mejorado */}
-      <div className="w-full flex items-center justify-center p-8">
-        <Card className="w-full max-w-md shadow-2xl border-white/5 bg-slate-900/50 backdrop-blur-xl">
+    <div className="relative min-h-screen w-full bg-[#020617] overflow-hidden">
+      {/* PANTALLA DE CARGA (SPLASH SCREEN) - EFECTO CINEMATOGRAFICO */}
+      <AnimatePresence mode="wait">
+        {showSplash && (
+          <motion.div 
+            key="splash"
+            initial={{ opacity: 1 }}
+            exit={{ 
+              opacity: 0, 
+              scale: 1.1, 
+              filter: "blur(10px)",
+              transition: { duration: 0.8, ease: "circOut" }
+            }}
+            className={cn(
+              "fixed inset-0 z-[100] flex items-center justify-center",
+              "bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]"
+            )}
+          >
+            <div className="flex flex-col items-center">
+              <Logo 
+                size="xl" 
+                animated={true} 
+                variant="full" 
+                layout="horizontal"
+                className="drop-shadow-[0_0_80px_rgba(34,211,238,0.3)]" 
+              />
+              {/* BARRA DE PROGRESO MEJORADA - Mas gruesa para visibilidad */}
+              <div className="w-64 h-1 bg-white/5 rounded-full mt-12 overflow-hidden border border-white/5 relative">
+                <motion.div 
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ duration: 4, ease: "easeInOut", delay: 0.5 }}
+                  className="h-full bg-cyan-400 shadow-[0_0_15px_#22d3ee] absolute left-0 top-0"
+                />
+              </div>
+              <p className="mt-4 text-cyan-500/50 text-[10px] uppercase tracking-[0.5em] animate-pulse">
+                Cargando Sistema...
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CONTENIDO PRINCIPAL DEL LOGIN - YA RENDERIZADO DETRAS */}
+      <main className="min-h-screen w-full flex items-center justify-center p-4 relative overflow-hidden bg-[radial-gradient(circle_at_center,_#0f172a_0%,_#020617_100%)]">
+        {/* Capas de profundidad cian sutiles */}
+        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-cyan-500/5 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-500/5 blur-[100px] rounded-full" />
+
+        <Card className="w-full max-w-md border-white/10 bg-slate-900/40 backdrop-blur-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative z-10 transition-all duration-700">
           <CardHeader className="space-y-1">
             <div className="flex justify-center mb-6">
-              <div className="p-3 bg-transparent rounded-2xl">
-                <Logo size="small" className="h-14 w-auto drop-shadow-md" animated={false} iconOnly={true} />
-              </div>
+              {/* Regresamos a solo el CUBO como pediste recientemente */}
+              <Logo size="small" variant="icon" iconOnly={true} animated={false} className="h-16 w-auto" />
             </div>
-            <CardTitle className="text-3xl font-black text-center text-white italic tracking-tighter">
+            <CardTitle className="text-3xl font-black text-center text-white italic tracking-tighter uppercase">
               INICIAR SESIÓN
             </CardTitle>
-            <CardDescription className="text-center text-slate-400 font-medium">
-              Accede al sistema de gestión JHIMS
+            <CardDescription className="text-center text-slate-400 font-medium font-mono uppercase tracking-widest text-[10px]">
+              JHIMS Inventory Management
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -177,7 +213,7 @@ function LoginContent() {
                 <span className="w-full border-t border-white/10" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-[#0f172a] px-2 text-slate-500 font-semibold tracking-wider">Credenciales de acceso</span>
+                <span className="bg-[#0f172a] px-2 text-slate-500 font-semibold tracking-wider rounded-lg">Credenciales de acceso</span>
               </div>
             </div>
 
@@ -287,10 +323,9 @@ function LoginContent() {
             </div>
           </CardFooter>
         </Card>
-      </div>
 
-      {/* Modal de Protección de Sesión (Escudo) */}
-      <Dialog open={showSessionConflict} onOpenChange={setShowSessionConflict}>
+        {/* Modal de Proteccin de Sesin (Escudo) */}
+        <Dialog open={showSessionConflict} onOpenChange={setShowSessionConflict}>
         <DialogContent className="sm:max-w-[450px] border-amber-200 bg-amber-50">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-amber-800">
@@ -463,6 +498,7 @@ function LoginContent() {
           </div>
         </DialogContent>
       </Dialog>
+    </main>
     </div>
   )
 }

@@ -100,7 +100,14 @@ export default function DashboardView() {
                     className="flex flex-col items-center justify-center text-center mb-6"
                 >
                     <div className="flex flex-row items-center justify-center mb-1">
-                        <Logo size="large" className="h-[120px] sm:h-[160px] w-auto drop-shadow-2xl" animated={true} iconOnly={false} />
+                        <Logo 
+                            size="large" 
+                            layout="horizontal" 
+                            variant="full" 
+                            animated={true} 
+                            dark={true} // Para fondo blanco en Visual Mode
+                            className="drop-shadow-sm" 
+                        />
                     </div>
                     <p className="text-sm sm:text-base font-medium tracking-wide text-muted-foreground/80">Seleccione un módulo para comenzar</p>
                 </motion.div>

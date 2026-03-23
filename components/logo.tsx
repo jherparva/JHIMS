@@ -13,6 +13,9 @@ interface LogoProps {
   animated?: boolean
   iconOnly?: boolean
   variant?: "text" | "icon" | "full"
+  layout?: "horizontal" | "vertical" | "stacked"
+  dark?: boolean // Nueva prop para fondos claros
+  showTagline?: boolean // Nueva prop para ocultar el eslogan
 }
 
 export function Logo({ 
@@ -20,11 +23,14 @@ export function Logo({
   className, 
   animated = false, 
   iconOnly = false,
-  variant = "text"
+  variant = "full",
+  layout = "horizontal",
+  dark = false,
+  showTagline = true
 }: LogoProps) {
   const [isReady, setIsReady] = useState(!animated)
   const [isColored, setIsColored] = useState(!animated)
-  // Determinar si debemos mostrar el icono basado en las props
+  
   const showIcon = iconOnly || variant === "icon" || variant === "full"
   const showText = !iconOnly && (variant === "text" || variant === "full")
 
@@ -37,145 +43,134 @@ export function Logo({
   }, [animated])
 
   const metrics = {
-    xs: { h: 32, view: "-50 0 500 250" },
-    small: { h: 48, view: "-50 0 500 250" },
-    medium: { h: 90, view: "-50 0 500 250" },
-    large: { h: 180, view: "-50 0 500 250" },
-    xl: { h: 320, view: "-50 0 600 300" },
+    xs: { iconH: "h-10", textH: "h-8", textW: "w-28", gap: "gap-0", slogan: "text-[5px]", textMt: "-8px", taglineMt: "-6px" },
+    small: { iconH: "h-20", textH: "h-14", textW: "w-44", gap: "gap-0", slogan: "text-[7px]", textMt: "-20px", taglineMt: "-10px" },
+    medium: { iconH: "h-28", textH: "h-20", textW: "w-64", gap: "gap-0", slogan: "text-[8px]", textMt: "-32px", taglineMt: "-14px" },
+    large: { iconH: "h-44", textH: "h-32", textW: "w-96", gap: "gap-0", slogan: "text-[10px]", textMt: "-50px", taglineMt: "-20px" },
+    xl: { iconH: "h-64", textH: "h-48", textW: "w-[560px]", gap: "gap-0", slogan: "text-xs", textMt: "-90px", taglineMt: "-32px" },
   }
 
   const m = metrics[size]
 
   return (
-    <div 
-      className={cn("flex flex-col items-center justify-center select-none bg-transparent overflow-visible", className)}
-      style={!className?.includes('h-') ? { height: m.h } : undefined}
-    >
+    <div className={cn("flex flex-col items-center justify-center select-none bg-transparent", className)}>
       <div className={cn(
-        "flex items-center gap-4 transition-all duration-1000",
-        isReady ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        "flex transition-all duration-1000",
+        // Lógica de Layout
+        layout === "vertical" ? "flex-col items-center" : "flex-row items-center",
+        isReady ? "opacity-100 scale-100" : "opacity-0 scale-95",
+        m.gap
       )}>
-        {/* ICONO 3D PREMIUM */}
+        
+        {/* ICONO CON EFECTO DE HOVER DINMICO */}
         {showIcon && (
-          <div className="relative group">
-            <motion.div
+          <motion.div 
+            className="relative flex-shrink-0 group/icon cursor-pointer h-fit"
+            whileHover="hover"
+            initial="initial"
+          >
+            {/* Brillo de fondo (Glow) */}
+            <div className="absolute inset-0 bg-cyan-500/10 blur-[40px] rounded-full -z-10 animate-pulse group-hover/icon:bg-cyan-500/30 transition-colors" />
+            
+            {/* EL ICONO: Escala y Rotacin sutil al pasar el mouse */}
+            <motion.img 
+              src="/icon1.png" 
+              alt="JHIMS 3D" 
+              className={cn("object-contain drop-shadow-2xl relative z-10", m.iconH)}
               initial={animated ? { rotateY: 90, opacity: 0 } : {}}
               animate={isReady ? { rotateY: 0, opacity: 1 } : {}}
-              transition={{ duration: 1.2, ease: "easeOut" }}
-              className="relative"
-            >
-              <img 
-                src="/icon.png" 
-                alt="JHIMS 3D" 
-                className={cn(
-                  "drop-shadow-[0_0_25px_rgba(34,211,238,0.4)] object-contain",
-                  size === "xl" ? "h-48" : size === "large" ? "h-32" : size === "medium" ? "h-16" : "h-10"
-                )}
-              />
-              {/* Brillo dinámico detrás del icono */}
-              <div className="absolute inset-0 bg-cyan-500/10 blur-[40px] rounded-full -z-10 animate-pulse" />
-            </motion.div>
-          </div>
-        )}
+              variants={{
+                hover: { 
+                  scale: 1.15, 
+                  rotateY: 15,
+                  filter: "brightness(1.2) drop-shadow(0 0 20px rgba(34,211,238,0.4))" 
+                }
+              }}
+              transition={{ duration: 0.4, type: "spring", stiffness: 300 }}
+            />
 
-        {/* TEXTO JHIMS CON EFECTO DE CARGA */}
-        {showText && (
-          <div className="relative">
-            <div className="relative">
-              {/* 1. Base desaturada (Sin Color) */}
-              <img 
-                src="/image_1b0560c5.png" 
-                alt="JHIMS Logo Base" 
-                className={cn(
-                  "w-auto h-auto object-contain filter grayscale invert brightness-75 opacity-20 mix-blend-screen",
-                  size === "xl" ? "h-24" : "h-full"
-                )}
-                style={size !== "xl" ? { maxHeight: m.h * 0.8 } : {}}
+            {/* EFECTO DE BRILLO (Rayon de luz que cruza) */}
+            <div className="absolute inset-0 z-20 overflow-hidden rounded-xl opacity-0 group-hover/icon:opacity-100 transition-opacity">
+              <motion.div 
+                className="absolute inset-0 w-1/2 h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"
+                variants={{
+                  hover: { 
+                    x: ["-100%", "200%"],
+                    transition: { duration: 1.2, repeat: Infinity, repeatDelay: 0.5 }
+                  }
+                }}
               />
-
-              {/* 2. Carga de Color (De Izquierda a Derecha) */}
-              <motion.div
-                className="absolute inset-0 overflow-hidden"
-                initial={animated ? { clipPath: "inset(0 100% 0 0)" } : { clipPath: "inset(0 0 0 0)" }}
-                animate={isColored ? { clipPath: "inset(0 0 0 0)" } : {}}
-                transition={{ duration: 1.5, ease: "easeInOut", delay: 0.5 }}
-              >
-                <img 
-                  src="/image_1b0560c5.png" 
-                  alt="JHIMS Logo Color" 
-                  className={cn(
-                    "w-auto h-auto object-contain filter drop-shadow-[0_0_15px_rgba(34,211,238,0.3)] mix-blend-screen",
-                    size === "xl" ? "h-24" : "h-full"
-                  )}
-                  style={size !== "xl" ? { maxHeight: m.h * 0.8 } : {}}
-                />
-                
-                {/* Línea de carga sutil */}
-                {animated && !isColored && (
-                  <motion.div 
-                    className="absolute top-0 bottom-0 w-[2px] bg-cyan-400 shadow-[0_0_15px_#22d3ee]"
-                    initial={{ left: "0%" }}
-                    animate={{ left: "100%" }}
-                    transition={{ duration: 1.5, ease: "easeInOut", delay: 0.5 }}
-                  />
-                )}
-              </motion.div>
             </div>
-            {size === "xl" && (
-              <motion.p 
-                initial={{ opacity: 0, y: 10 }}
-                animate={isColored ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: 1.8 }}
-                className="text-cyan-400/60 text-xs font-bold tracking-[0.3em] uppercase mt-2 text-center"
-              >
-                Intelligent Inventory Management
-              </motion.p>
-            )}
-          </div>
+          </motion.div>
         )}
-      </div>
-    </div>
-  )
-}
 
-export function OfflineBanner() {
-  const [isRetrying, setIsRetrying] = useState(false)
-  const { isOnline } = useConnectionStatus()
-
-  if (isOnline === undefined) return null 
-  if (isOnline) return null
-
-  const handleRetry = () => {
-    setIsRetrying(true)
-    window.location.reload()
-  }
-
-  return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-red-600 text-white p-3 text-center shadow-lg">
-      <div className="flex items-center justify-center gap-3 max-w-4xl mx-auto">
-        <WifiOff className="h-5 w-5 flex-shrink-0" />
-        <div className="flex flex-col sm:flex-row items-center gap-2">
-          <span className="font-medium">Sin conexión a internet</span>
-          <span className="text-sm opacity-90">
-            - Modo offline activado. Algunas funciones pueden estar limitadas.
-          </span>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={handleRetry}
-          disabled={isRetrying}
-          className="bg-white/20 hover:bg-white/30 text-white border-white/30"
-        >
-          {isRetrying ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <>
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Reintentar
-            </>
+        {/* CONTENEDOR DE TEXTOS (Nombre + Slogan) */}
+        <div 
+          className={cn(
+            "flex flex-col",
+            layout === "vertical" ? "items-center" : "items-start"
           )}
-        </Button>
+          style={layout === "horizontal" && showText ? { marginLeft: m.textMt } : {}}
+        >
+          {/* BLOQUE DE TEXTOS (Wordmark + Tagline Centrados entre s) */}
+          {showText && (
+            <div className="flex flex-col items-center">
+              <div className={cn("relative group/text", m.textH, m.textW)}>
+                {/* 1. Capas del nombre JHIMS */}
+                <div 
+                  className={cn(
+                    "absolute inset-0 transition-all duration-500",
+                    dark ? "bg-slate-900/10" : "bg-white/20"
+                  )}
+                  style={{
+                    maskImage: 'url(/image_1b0560c5.png)',
+                    WebkitMaskImage: 'url(/image_1b0560c5.png)',
+                    maskSize: 'contain',
+                    maskRepeat: 'no-repeat',
+                    maskPosition: 'center'
+                  }}
+                />
+                <motion.div
+                  className="absolute inset-0 overflow-hidden"
+                  initial={animated ? { clipPath: "inset(0 100% 0 0)" } : { clipPath: "inset(0 0 0 0)" }}
+                  animate={isColored ? { clipPath: "inset(0 0 0 0)" } : {}}
+                  transition={{ duration: 1.5, ease: "easeInOut", delay: 0.5 }}
+                >
+                  <div 
+                    className={cn(
+                      "absolute inset-0",
+                      dark ? "bg-slate-900" : "bg-white shadow-[0_0_40px_rgba(34,211,238,0.6)]"
+                    )}
+                    style={{
+                      maskImage: 'url(/image_1b0560c5.png)',
+                      WebkitMaskImage: 'url(/image_1b0560c5.png)',
+                      maskSize: 'contain',
+                      maskRepeat: 'no-repeat',
+                      maskPosition: 'center'
+                    }}
+                  />
+                </motion.div>
+              </div>
+
+              {/* ESLOGAN: DINAMICAMENTE PEGADO BAJO "JHIMS." */}
+              {showTagline && (
+                <motion.p 
+                  initial={{ opacity: 0 }}
+                  animate={isColored ? { opacity: 1 } : {}}
+                  transition={{ delay: 1.5 }}
+                  className={cn(
+                    "font-bold uppercase tracking-[0.15em] whitespace-nowrap text-center",
+                    dark ? "text-slate-600" : "text-cyan-400/70",
+                    m.slogan
+                  )}
+                  style={{ marginTop: m.taglineMt }}
+                >
+                  Inventory Management System
+                </motion.p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

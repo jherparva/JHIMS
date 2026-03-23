@@ -71,9 +71,17 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-gradient-to-b from-background to-muted/40 shadow-lg print:hidden">
-      {/* Logo con animación sutil */}
-      <div className="flex flex-col py-6 items-center justify-center border-b px-6 bg-background/60 backdrop-blur">
-        <Logo size="large" className="h-[110px] w-auto drop-shadow-sm" />
+      {/* Logo corporativo horizontal */}
+      <div className="flex flex-col py-8 items-center justify-center border-b px-2 bg-background/60 backdrop-blur overflow-hidden">
+        <Logo 
+          size="small" 
+          layout="horizontal" 
+          variant="full" 
+          animated={false} 
+          dark={true}
+          showTagline={false}
+          className="scale-95" 
+        />
       </div>
 
       {/* Navegación */}

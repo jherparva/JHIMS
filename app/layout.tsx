@@ -5,12 +5,12 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-    title: "JHIMS Inventory V2",
+    title: "JHIMS Inventory",
     description: "Sistema de Gestión de Inventario",
     icons: {
-        icon: '/icon.png',
-        shortcut: '/icon.png',
-        apple: '/icon.png',
+        icon: '/icon1.png',
+        shortcut: '/icon1.png',
+        apple: '/icon1.png',
     }
 };
 
