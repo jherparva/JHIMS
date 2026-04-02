@@ -1,3 +1,8 @@
+// =============================================================================
+// API PRODUCTOS - JHIMS Inventory
+// =============================================================================
+// Gestión CRUD de productos con búsqueda y relaciones
+// =============================================================================
 import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db/mongodb"
 import Product from "@/lib/db/models/Product"
@@ -5,6 +10,11 @@ import Category from "@/lib/db/models/Category"
 import Supplier from "@/lib/db/models/Supplier"
 import { withSessionContext } from "@/lib/api-wrapper"
 
+// =============================================================================
+// GET /api/productos - LISTAR PRODUCTOS
+// =============================================================================
+// Parámetro: search (opcional) - Busca por nombre o SKU
+// Retorna: Lista de productos con categoría y proveedor
 export const GET = withSessionContext(async (req: NextRequest, context: any) => {
     try {
         await connectDB()
@@ -12,20 +22,22 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
         const { searchParams } = new URL(req.url)
         const search = searchParams.get("search") || ""
 
+        // Construir consulta de búsqueda
         let query: any = {}
 
         if (search) {
             query.$or = [
-                { name: { $regex: search, $options: "i" } },
-                { sku: { $regex: search, $options: "i" } },
+                { name: { $regex: search, $options: "i" } },  // Búsqueda en nombre
+                { sku: { $regex: search, $options: "i" } },   // Búsqueda en SKU
             ]
         }
 
+        // Ejecutar consulta con relaciones
         const products = await Product.find(query)
-            .populate("category", "name") // Corregido de categoryId a category
-            .populate("supplier", "name") // Corregido de supplierId a supplier
-            .sort({ createdAt: -1 })
-            .lean()
+            .populate("category", "name")    // Categoría (solo nombre)
+            .populate("supplier", "name")    // Proveedor (solo nombre)
+            .sort({ createdAt: -1 })          // Más recientes primero
+            .lean()                          // Objetos planos
 
         return NextResponse.json({ products })
     } catch (error: any) {
@@ -37,15 +49,22 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
     }
 })
 
+// =============================================================================
+// POST /api/productos - CREAR PRODUCTO
+// =============================================================================
+// Recibe: Datos completos del producto
+// Retorna: Producto creado con ID
 export const POST = withSessionContext(async (req: NextRequest, context: any) => {
     try {
         await connectDB()
 
         const body = await req.json()
-        console.log("POST /api/products received body:", body)
+        console.log("POST /api/products body:", body)
         const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description } = body
 
-        // Validaciones
+        // =============================================================================
+        // 1. VALIDACIONES
+        // =============================================================================
         if (!name || !sku || !salePrice) {
             return NextResponse.json(
                 { error: "Nombre, SKU y precio de venta son requeridos" },

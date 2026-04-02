@@ -26,7 +26,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         await connectDB()
 
         const body = await req.json()
-        const { name, contactName, email, phone, address, taxId } = body
+        const { name, contactName, email, phone, address, taxId, companyId } = body
 
         if (!name) {
             return NextResponse.json(
@@ -35,20 +35,33 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             )
         }
 
-        const supplier = await Supplier.create({
+        // Si se provee companyId en el body, lo usamos (ej. superadmin o migraciones)
+        // De lo contrario, el plugin lo inyectará desde la sesión (context.companyId)
+        const supplierData: any = {
             name,
             contactName,
             email,
             phone,
             address,
             taxId,
-        })
+        }
+
+        if (companyId) {
+            supplierData.companyId = companyId
+        }
+
+        const supplier = await Supplier.create(supplierData)
 
         return NextResponse.json(supplier, { status: 201 })
     } catch (error: any) {
-        console.error("Error creating supplier:", error)
+        console.error("FATAL: Error creating supplier:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+            errors: error.errors
+        })
         return NextResponse.json(
-            { error: "Error al crear proveedor" },
+            { error: "Error al crear proveedor: " + (error.message || "Error desconocido") },
             { status: 500 }
         )
     }

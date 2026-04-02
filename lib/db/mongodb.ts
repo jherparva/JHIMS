@@ -50,15 +50,18 @@ export async function connectDB(): Promise<typeof mongoose> {
             bufferCommands: false,
         }
 
+        console.log("📡 Intentando conectar a MongoDB con URI:", MONGODB_URI ? `${MONGODB_URI.substring(0, 20)}...` : "VACÍA")
+
         cached.promise = mongoose.connect(MONGODB_URI, opts).then((myMongoose) => {
-            console.log("✅ Conectado a MongoDB Atlas")
+            console.log("✅ Conexión exitosa a MongoDB:", myMongoose.connection.db?.databaseName)
             return myMongoose
         })
     }
 
     try {
         cached.conn = await cached.promise
-    } catch (e) {
+        console.log("🏁 Base de Datos lista para operaciones")
+    } catch (e: any) {
         cached.promise = null
         console.error("❌ Error conectando a MongoDB:", e)
         throw e

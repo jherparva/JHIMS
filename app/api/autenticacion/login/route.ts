@@ -1,3 +1,8 @@
+// =============================================================================
+// API AUTENTICACIÓN - LOGIN
+// =============================================================================
+// Inicia sesión de usuarios con JWT y cookies
+// =============================================================================
 import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db/mongodb"
 import User, { IUser } from "@/lib/db/models/User"
@@ -5,6 +10,11 @@ import bcrypt from "bcryptjs"
 import { SessionUser, createToken } from "@/lib/auth"
 import { randomUUID } from "crypto"
 
+// =============================================================================
+// POST /api/autenticacion/login
+// =============================================================================
+// Recibe: username, password, rememberMe
+// Retorna: Token JWT y datos del usuario
 export async function POST(req: NextRequest) {
     try {
         await connectDB()
@@ -12,6 +22,9 @@ export async function POST(req: NextRequest) {
         const body = await req.json()
         const { username, password, rememberMe } = body
 
+        // =============================================================================
+        // 1. VALIDAR CAMPOS
+        // =============================================================================
         if (!username || !password) {
             return NextResponse.json(
                 { error: "Usuario y contraseña son requeridos" },
@@ -19,10 +32,13 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // Buscar usuario (omitir filtro de tenant para el login)
+        // =============================================================================
+        // 2. BUSCAR USUARIO
+        // =============================================================================
+        // skipTenantFilter: Permite login global (sin filtro de empresa)
         const user = (await User.findOne({ username })
             .setOptions({ skipTenantFilter: true })
-            .select("+password")
+            .select("+password")  // Incluir campo password
             .lean()) as IUser | null
 
         if (!user || !user.isActive) {
@@ -32,7 +48,9 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // Verificar contraseña
+        // =============================================================================
+        // 3. VERIFICAR CONTRASEÑA
+        // =============================================================================
         const isValidPassword = await bcrypt.compare(password, user.password)
         if (!isValidPassword) {
             return NextResponse.json(
@@ -41,10 +59,10 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // ── SESIÓN ÚNICA ─────────────────────────────────────────────────
-        // Generar un token de sesión único para este login.
-        // Al guardarlo en la BD, cualquier token anterior queda automáticamente
-        // invalidado porque ya no coincidirá con el nuevo valor.
+        // =============================================================================
+        // 4. SESIÓN ÚNICA
+        // =============================================================================
+        // Genera token único e invalida sesiones anteriores
         const sessionToken = randomUUID()
 
         await User.findByIdAndUpdate(
@@ -55,18 +73,20 @@ export async function POST(req: NextRequest) {
             },
             { setOptions: { skipTenantFilter: true } }
         )
-        // ─────────────────────────────────────────────────────────────────
 
-        // ── Duración de sesión según "Recordarme" ─────────────────────
+        // =============================================================================
+        // 5. DURACIÓN DE SESIÓN
+        // =============================================================================
         const sessionDurationSeconds = rememberMe
-            ? 60 * 60 * 24 * 7   // 7 días si marcó "Recordarme"
-            : 60 * 60 * 24       // 24 horas si NO marcó
+            ? 60 * 60 * 24 * 7   // 7 días con "Recordarme"
+            : 60 * 60 * 24       // 24 horas normal
         const jwtExpiration = rememberMe ? "7d" : "24h"
         
-        console.log(`🔑 LOGIN: Usuario: ${user.username} (${user.role}) - Recordarme: ${rememberMe ? "SÍ" : "NO"} - Sesión: ${jwtExpiration}`)
-        // ─────────────────────────────────────────────────────────────────
+        console.log(`🔑 LOGIN: ${user.username} (${user.role}) - Recordarme: ${rememberMe ? "SÍ" : "NO"}`)
 
-        // Crear sesión JWT (incluye sessionToken para validación posterior)
+        // =============================================================================
+        // 6. CREAR TOKEN JWT
+        // =============================================================================
         const sessionUser: SessionUser = {
             id: user._id.toString(),
             username: user.username,
@@ -80,7 +100,9 @@ export async function POST(req: NextRequest) {
 
         const token = await createToken(sessionUser, sessionToken, jwtExpiration)
 
-        // Respuesta con cookie de sesión
+        // =============================================================================
+        // 7. RESPUESTA Y COOKIES
+        // =============================================================================
         const response = NextResponse.json({
             user: {
                 id: user._id,
@@ -92,16 +114,16 @@ export async function POST(req: NextRequest) {
             },
         })
 
-        // Establecer token de autenticación
+        // Cookie principal de autenticación
         response.cookies.set("jhims-auth-token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            httpOnly: true,                    // Solo servidor
+            secure: process.env.NODE_ENV === "production", // HTTPS
+            sameSite: "lax",                   // Anti CSRF
             maxAge: sessionDurationSeconds,
             path: "/",
         })
 
-        // Establecer cookie de sesión de navegador para evitar bucles
+        // Cookie de sesión (evita bucles)
         const browserSessionId = Math.random().toString(36).substring(2, 15)
         const sessionCookieName = `jhims-session-${user._id.toString().substring(0, 8)}`
         
@@ -113,7 +135,7 @@ export async function POST(req: NextRequest) {
             path: "/",
         })
 
-        // Establecer ID único de ventana para aislar sesiones
+        // Cookie de ID de ventana (aisla sesiones)
         const windowId = 'win_' + Math.random().toString(36).substring(2, 15) + '_' + Date.now()
         const windowCookieName = `jhims-window-${user._id.toString().substring(0, 8)}`
         
@@ -125,10 +147,14 @@ export async function POST(req: NextRequest) {
             path: "/",
         })
 
-        console.log(`LOGIN: Asignando windowId: ${windowId} para usuario: ${user.username} (${user.role}) - cookie: ${windowCookieName}`)
+        console.log(`LOGIN: WindowId ${windowId} para ${user.username}`)
 
         return response
+
     } catch (error: any) {
+        // =============================================================================
+        // 8. ERROR
+        // =============================================================================
         console.error("Error en login:", error)
         return NextResponse.json(
             { error: "Error al iniciar sesión" },

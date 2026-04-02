@@ -1,29 +1,52 @@
+// =============================================================================
+// MIDDLEWARE - JHIMS Inventory
+// =============================================================================
+// Autenticación y autorización centralizada
+// =============================================================================
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { jwtVerify } from 'jose'
 
+// =============================================================================
+// CONFIGURACIÓN
+// =============================================================================
+// Clave secreta para tokens JWT
 const JWT_SECRET = new TextEncoder().encode(
     process.env.NEXTAUTH_SECRET || 'jhims-secret-key-2025'
 )
 
-// Rutas que solo puede acceder el administrador de empresa
+// =============================================================================
+// RUTAS POR ROL
+// =============================================================================
+
+// Rutas solo para admin de empresa
 const ADMIN_ONLY_PATHS = [
-    '/usuarios',
-    '/configuracion',
-    '/reportes',
-    '/entrada-inventario',
-    '/proveedores',
-    '/categorias',
-    '/inventario',
+    '/usuarios',           // Gestión usuarios
+    '/configuracion',      // Configuración sistema
+    '/reportes',          // Reportes
+    '/entrada-inventario', // Entrada inventario
+    '/proveedores',       // Gestión proveedores
+    '/categorias',        // Gestión categorías
+    '/inventario',        // Gestión inventario
 ]
 
-// Rutas exclusivas del superadmin (dueño de la plataforma)
+// Rutas exclusivas del superadmin
 const SUPERADMIN_PATHS = ['/super-administrador']
 
-// Rutas públicas (solo las que realmente no requieren autenticación)
-const PUBLIC_PATHS = ['/inicio-sesion', '/olvide-contrasena', '/api/autenticacion/login', '/api/autenticacion/recuperar-password', '/api/seed', '/api/test-db', '/api/seed-data']
+// Rutas públicas (sin autenticación)
+const PUBLIC_PATHS = [
+    '/inicio-sesion',                           // Login
+    '/olvide-contrasena',                      // Recuperar contraseña
+    '/api/autenticacion/login',                // API login
+    '/api/autenticacion/recuperar-password',   // API recuperación
+    '/api/seed',                               // API inicialización
+    '/api/test-db',                            // API test BD
+    '/api/seed-data'                           // API carga datos
+]
 
-// Redirecciones de rutas en inglés → español (rutas antiguas que pudieron quedar en el historial)
+// =============================================================================
+// REDIRECCIONES (INGLÉS → ESPAÑOL)
+// =============================================================================
 const RUTAS_REDIRECCION: Record<string, string> = {
     '/login': '/inicio-sesion',
     '/register': '/inicio-sesion',
@@ -45,108 +68,120 @@ const RUTAS_REDIRECCION: Record<string, string> = {
     '/super-admin': '/super-administrador',
 }
 
-// Función para verificar si es una nueva ventana/pestaña
+// =============================================================================
+// FUNCIONES AUXILIARES
+// =============================================================================
+
+// Detecta si es nueva ventana/pestaña
 function isNewWindowSession(request: NextRequest): boolean {
-    // Verificar si hay cookies de sesión (cualquier cookie que comience con jhims-session-)
     const allCookies = request.cookies.getAll()
     const sessionCookies = allCookies.filter(cookie => cookie.name.startsWith('jhims-session-'))
-    
-    // Si no hay cookies de sesión, es una nueva ventana/pestaña
-    if (sessionCookies.length === 0) {
-        return true
-    }
-    
-    // Si hay cookies de sesión, no es nueva ventana
-    return false
+    return sessionCookies.length === 0
 }
 
-// Función para generar un ID único de ventana
+// Genera ID único para ventana
 function generateWindowId(): string {
     return 'win_' + Math.random().toString(36).substring(2, 15) + 
            Math.random().toString(36).substring(2, 15) + 
            '_' + Date.now()
 }
 
+// =============================================================================
+// FUNCIÓN PRINCIPAL
+// =============================================================================
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
-    // Redirigir rutas en inglés a sus equivalentes en español (301 permanente)
+    // =============================================================================
+    // 1. REDIRECCIONES DE IDIOMA
+    // =============================================================================
     const rutaEspanol = RUTAS_REDIRECCION[pathname]
     if (rutaEspanol && rutaEspanol !== pathname) {
         return NextResponse.redirect(new URL(rutaEspanol, request.url), { status: 301 })
     }
 
-    // Permitir rutas públicas permanentemente
+    // =============================================================================
+    // 2. PERMITIR RUTAS PÚBLICAS
+    // =============================================================================
     const isPublicPath = PUBLIC_PATHS.some(path => pathname.startsWith(path))
     if (isPublicPath) {
         return NextResponse.next()
     }
 
-    // 1. Obtención del token
+    // =============================================================================
+    // 3. VERIFICAR TOKEN
+    // =============================================================================
     const token = request.cookies.get('jhims-auth-token')?.value
     if (!token) {
-        // Si no hay token en absoluto, mandamos al login
         return NextResponse.redirect(new URL('/inicio-sesion', request.url))
     }
 
     try {
-        // 2. Verificación de identidad inmediata
+        // =============================================================================
+        // 4. VERIFICAR JWT
+        // =============================================================================
         const { payload } = await jwtVerify(token, JWT_SECRET)
-        const role = payload.role as string
-        const userId = payload.id as string
+        const role = payload.role as string    // Rol usuario
+        const userId = payload.id as string    // ID usuario
 
-        // 3. Sistema de sesión robusto (Post-Autenticación)
-        // En lugar de redirigir, si el token es válido permitimos el paso
-        // y opcionalmente regeneramos los indicadores de sesión si faltan.
+        // =============================================================================
+        // 5. SESIÓN POR VENTANA
+        // =============================================================================
         const response = NextResponse.next()
         
-        // Verificación opcional de ID de ventana (informativo en producción para no bloquear)
         const windowCookieName = `jhims-window-${userId.substring(0, 8)}`
         let windowId = request.cookies.get(windowCookieName)?.value
         
         if (!windowId && !pathname.startsWith('/api')) {
             windowId = generateWindowId()
             response.cookies.set(windowCookieName, windowId, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === "production",
-                sameSite: "lax",
-                maxAge: 60 * 60 * 24,
+                httpOnly: true,                    // Solo servidor
+                secure: process.env.NODE_ENV === "production", // HTTPS
+                sameSite: "lax",                   // Anti CSRF
+                maxAge: 60 * 60 * 24,             // 24 horas
                 path: "/",
             })
-            console.log(`MIDDLEWARE [INFO]: Recuperando windowId para usuario autenticado: ${userId}`)
+            console.log(`MIDDLEWARE [INFO]: WindowId para usuario: ${userId}`)
         }
 
-        // 4. Lógica de acceso por Rol
+        // =============================================================================
+        // 6. ACCESO POR ROL
+        // =============================================================================
+
         const isSuperAdminPath = SUPERADMIN_PATHS.some(p => pathname.startsWith(p))
         
         if (role === 'superadmin') {
-            // El superadmin debe estar en su panel, o en las APIs
+            // Superadmin: solo su panel o APIs
             if (!isSuperAdminPath && !pathname.startsWith('/api')) {
                 return NextResponse.redirect(new URL('/super-administrador', request.url))
             }
             return response
         }
 
-        // Restricción de acceso a panel superadmin para otros roles
+        // Restringir panel superadmin a otros roles
         if (isSuperAdminPath) {
             return NextResponse.redirect(new URL('/dashboard', request.url))
         }
 
-        // Verificación acceso a rutas exclusivas del admin de empresa
+        // Verificar rutas de admin
         const isAdminOnlyPath = ADMIN_ONLY_PATHS.some(path => pathname.startsWith(path))
         if (isAdminOnlyPath && role !== 'admin' && role !== 'superadmin') {
             return NextResponse.json({ error: "Acceso denegado" }, { status: 403 })
         }
 
         return response
+
     } catch (e: any) {
-        // 5. Sistema de RESCATE en Producción (Evita bucles por desincronización de llaves)
+        // =============================================================================
+        // 7. RECUPERACIÓN (PRODUCCIÓN)
+        // =============================================================================
+        // Si falla JWT, intenta decodificar sin verificar firma
         try {
             const { decodeJwt } = await import('jose')
             const decoded = decodeJwt(token)
             
             if (decoded && decoded.role) {
-                console.warn(`MIDDLEWARE [RECOVERY]: Acceso permitido vía Decode (Error de Firma): ${decoded.id}`)
+                console.warn(`MIDDLEWARE [RECOVERY]: Acceso vía Decode: ${decoded.id}`)
                 
                 const response = NextResponse.next()
                 const role = decoded.role as string
@@ -166,17 +201,23 @@ export async function middleware(request: NextRequest) {
                 return response
             }
         } catch (decodeError) {
-            console.error("MIDDLEWARE: Error crítico de decodificación", decodeError)
+            console.error("MIDDLEWARE: Error decodificación", decodeError)
         }
 
-        // Si falló incluso el rescate, entonces sí mandamos al login
-        console.error("MIDDLEWARE: Token totalmente inválido, redirigiendo al login", e.message)
+        // =============================================================================
+        // 8. REDIRECCIÓN FINAL
+        // =============================================================================
+        console.error("MIDDLEWARE: Token inválido, redirigiendo login", e.message)
         const response = NextResponse.redirect(new URL('/inicio-sesion', request.url))
-        response.cookies.delete('jhims-auth-token')
+        response.cookies.delete('jhims-auth-token')  // Eliminar token
         return response
     }
 }
 
+// =============================================================================
+// CONFIGURACIÓN DE RUTAS A INTERCEPTAR
+// =============================================================================
+// Excluye: archivos estáticos, imágenes, fonts, etc.
 export const config = {
     matcher: [
         '/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.jpg$|.*\\.svg$).*)',

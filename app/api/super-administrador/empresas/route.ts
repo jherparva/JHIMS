@@ -274,7 +274,6 @@ export async function POST(req: NextRequest) {
                     lastResetDate: new Date()
                 },
                 supportPriority: "standard",
-                approvedBy: user.id,
                 approvedAt: new Date()
             })
 
@@ -334,7 +333,12 @@ export async function POST(req: NextRequest) {
             }, { status: 201 })
 
         } catch (error: any) {
-            console.error("SUPERADMIN CREATE COMPANY ERROR:", error)
+            console.error("FATAL: SUPERADMIN CREATE COMPANY ERROR:", {
+                message: error.message,
+                stack: error.stack,
+                name: error.name,
+                errors: error.errors // Para errores de validación de Mongoose
+            })
             return NextResponse.json(
                 { error: "Error al crear empresa: " + (error.message || "Error desconocido") },
                 { status: 500 }
