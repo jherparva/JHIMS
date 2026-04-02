@@ -268,9 +268,9 @@ export default function ReportsView() {
         const wsSales = XLSX.utils.aoa_to_sheet(rowsSales);
         const wsPurchases = XLSX.utils.aoa_to_sheet(rowsPurchases);
 
-        // 4. APLICAR FORMATOS Y AUTOMATIZACIONES A TODAS LAS HOJAS
-        [wsSummary, wsSales, wsPurchases].forEach(ws => {
-            // Aplicar formato de moneda a todas las celdas numéricas
+        // --- 4. AUTOMATIZACIONES DE FORMATO Y AUTO-AJUSTE ---
+        const applyCommonFormats = (ws: XLSX.WorkSheet, dataRows: any[][]) => {
+            // A. Formato de Moneda Dinámico
             const ref = ws['!ref'];
             if (ref) {
                 const range = XLSX.utils.decode_range(ref);
@@ -284,12 +284,23 @@ export default function ReportsView() {
                     }
                 }
             }
-        });
 
-        // Ajustar anchos (Auto-fit)
-        wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
-        wsSales['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
-        wsPurchases['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }];
+            // B. AUTO-AJUSTE DINÁMICO DE COLUMNAS (Mide el texto más largo)
+            const colWidths = dataRows[dataRows.length - 1].map((_, colIndex) => {
+                let maxLen = 10; // Ancho base
+                dataRows.forEach(row => {
+                    const val = row[colIndex] ? row[colIndex].toString() : "";
+                    if (val.length > maxLen) maxLen = val.length;
+                });
+                return { wch: Math.min(maxLen + 2, 50) }; // Máximo 50 de ancho para no exagerar
+            });
+            ws['!cols'] = colWidths;
+        };
+
+        // Aplicar a cada hoja
+        applyCommonFormats(wsSummary, rowsSummary);
+        applyCommonFormats(wsSales, rowsSales);
+        applyCommonFormats(wsPurchases, rowsPurchases);
 
         // Filtros (Hoja de ventas empieza tabla en fila 4 [index 3])
         wsSales['!autofilter'] = { ref: `A4:I${rowsSales.length}` };
