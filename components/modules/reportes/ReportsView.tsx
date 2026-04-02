@@ -191,55 +191,76 @@ export default function ReportsView() {
         const totalCompras = data.dailySummary.reduce((acc: number, curr: any) => acc + curr.compras, 0);
         const balance = totalVentas - totalCompras;
 
-        // 1. Crear el arreglo de datos para el Excel
+        // 1. Preparar las filas con estructura de "Dashboard"
         const rows = [
-            ["JHIMS - REPORTE DE RENDIMIENTO"],
-            [data.company?.name || "N/A"],
-            ["NIT:", data.company?.taxId || "N/A"],
-            ["Periodo:", `${dateRange.from} al ${dateRange.to}`],
-            ["Fecha Generación:", new Date().toLocaleString()],
-            [], // Espacio
-            ["RESUMEN FINANCIERO"],
-            ["(+) TOTAL INGRESOS", totalVentas],
-            ["(-) TOTAL INVERSIONES", totalCompras],
-            ["(=) BALANCE OPERATIVO", balance],
-            [], // Espacio
-            ["DESGLOSE DIARIO"],
-            ["Fecha", "Día", "Ventas ($)", "Compras ($)", "Balance ($)"]
+            ["JHIMS - REPORTE GERENCIAL DE RENDIMIENTO"],
+            [`EMPRESA: ${data.company?.name || "N/A"}`],
+            [`NIT: ${data.company?.taxId || "N/A"}`],
+            [`PERIODO: ${dateRange.from} AL ${dateRange.to}`],
+            [`FECHA DE GENERACIÓN: ${new Date().toLocaleString()}`],
+            [],
+            ["--- RESUMEN FINANCIERO EJECUTIVO ---"],
+            ["CONCEPTO", "VALOR ($)"],
+            ["(+) TOTAL INGRESOS (VENTAS)", totalVentas],
+            ["(-) TOTAL INVERSIONES (COMPRAS)", totalCompras],
+            ["(=) BALANCE OPERATIVO NETO", balance],
+            [],
+            ["--- DESGLOSE DIARIO DETALLADO ---"],
+            ["FECHA", "DÍA", "INGRESOS ($)", "EGRESOS ($)", "DIFERENCIA ($)"]
         ];
 
-        // 2. Agregar los datos diarios
+        // 2. Insertar registros
         data.dailySummary.forEach((d: any) => {
             rows.push([
                 d.fullDate,
-                d.name.replace(".", ""),
+                d.name.replace(".", "").toUpperCase(),
                 d.ventas,
                 d.compras,
                 d.ventas - d.compras
             ]);
         });
 
-        // 3. Crear el libro y la hoja
+        // 3. Crear Hoja de Trabajo
         const worksheet = XLSX.utils.aoa_to_sheet(rows);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte JHIMS");
 
-        // 4. Ajustar anchos de columna básicos
-        if (worksheet['!cols']) {
-            worksheet['!cols'] = [
-                { wch: 15 }, // Fecha
-                { wch: 12 }, // Día
-                { wch: 15 }, // Ventas
-                { wch: 15 }, // Compras
-                { wch: 15 }  // Balance
-            ];
+        // 4. APLICAR FORMATOS DE MONEDA (Excel nativo)
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:E1");
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+                const cell_address = { c: C, r: R };
+                const cell_ref = XLSX.utils.encode_cell(cell_address);
+                const cell = worksheet[cell_ref];
+                
+                if (cell && typeof cell.v === 'number') {
+                    // Aplicar formato de contabilidad/moneda
+                    cell.t = 'n';
+                    cell.z = '$#,##0';
+                }
+            }
         }
 
-        // 5. Generar y descargar
-        const fileName = `Reporte_JHIMS_${(data.company?.name || "Ventas").replace(/\s/g, "_")}.xlsx`;
+        // 5. AUTO-AJUSTE DINÁMICO DE COLUMNAS (Auto-Fit)
+        const colWidths = rows[rows.length - 1].map((_, colIndex) => {
+            let maxLen = 12; // Mínimo
+            rows.forEach(row => {
+                const val = row[colIndex] ? row[colIndex].toString() : "";
+                if (val.length > maxLen) maxLen = val.length;
+            });
+            return { wch: maxLen + 2 };
+        });
+        worksheet['!cols'] = colWidths;
+
+        // 6. ACTIVAR AUTO-FILTROS (Filtros nativos en los encabezados)
+        // La tabla de datos empieza en la fila 14 (índice 13)
+        worksheet['!autofilter'] = { ref: `A14:E${rows.length}` };
+
+        // 7. Generar y descargar
+        const fileName = `REPORTE_JHIMS_${(data.company?.name || "VENTAS").replace(/\s/g, "_")}_${dateRange.from}_${dateRange.to}.xlsx`;
         XLSX.writeFile(workbook, fileName);
         
-        toast.success("Excel Profesional generado sin errores");
+        toast.success("Excel Inteligente generado: Columnas auto-ajustadas y filtros activos");
     }
 
     if (loading) {
