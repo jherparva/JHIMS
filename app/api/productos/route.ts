@@ -92,6 +92,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             minStock: minStock || 0,
             description: description || "",
             imageUrl: body.imageUrl || body.image || "",
+            companyId: context.companyId, // <--- REQUERIDO: Inyectar ID de sesión
         })
 
         return NextResponse.json(product, { status: 201 })

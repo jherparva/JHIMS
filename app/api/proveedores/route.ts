@@ -36,7 +36,8 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         }
 
         // Si se provee companyId en el body, lo usamos (ej. superadmin o migraciones)
-        // De lo contrario, el plugin lo inyectará desde la sesión (context.companyId)
+        // De lo contrario, usamos el de la sesión (context.companyId) obligatoriamente para 
+        // evitar errores de validación de Mongoose que ocurren antes del hook del plugin.
         const supplierData: any = {
             name,
             contactName,
@@ -44,10 +45,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             phone,
             address,
             taxId,
-        }
-
-        if (companyId) {
-            supplierData.companyId = companyId
+            companyId: companyId || context.companyId
         }
 
         const supplier = await Supplier.create(supplierData)

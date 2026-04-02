@@ -38,6 +38,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         const category = await Category.create({
             name,
             description: description || "",
+            companyId: context.companyId, // <--- REQUERIDO
         })
 
         return NextResponse.json(category, { status: 201 })
