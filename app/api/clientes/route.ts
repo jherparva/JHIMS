@@ -41,6 +41,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             phone,
             address,
             taxId,
+            companyId: context.companyId,
         })
 
         return NextResponse.json(customer, { status: 201 })

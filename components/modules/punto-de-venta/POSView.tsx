@@ -391,7 +391,7 @@ export default function POSView() {
                     items: [...cart],
                     total: getTotal(),
                     date: new Date().toLocaleString(),
-                    paymentMethod: paymentMethod === 'cash' ? 'Efectivo' : paymentMethod === 'card' ? 'Tarjeta' : 'Transferencia'
+                    paymentMethod: paymentMethod === 'cash' ? 'Efectivo' : 'Transferencia'
                 }
                 setLastSale(saleData)
                 setIsReceiptOpen(true)
@@ -548,10 +548,11 @@ export default function POSView() {
 
                     {/* Botón de cierre de caja rápido */}
                     <Button 
-                        variant="ghost" 
+                        variant="default" 
                         size="sm" 
                         onClick={() => setIsArqueoOpen(true)}
-                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 gap-2 font-bold text-[10px] uppercase"
+                        className="bg-rose-600 hover:bg-rose-700 text-white gap-2 font-black text-[10px] uppercase shadow-lg shadow-rose-200 rounded-xl"
+                        title="Hacer Arqueo de Caja y Cerrar Turno: Haz clic aquí al finalizar tu jornada para cuadrar el dinero."
                     >
                         <LogOut size={14} /> Cerrar Caja
                     </Button>
@@ -659,8 +660,14 @@ export default function POSView() {
                         <Button variant="outline" size="icon" className="h-9 w-9 border-amber-200 bg-amber-50 text-amber-700" onClick={openDrawer}>
                             <Wallet size={18} />
                         </Button>
-                        <Button variant="outline" size="icon" className="h-9 w-9 border-emerald-200 bg-emerald-50 text-emerald-700" onClick={() => setIsArqueoOpen(true)}>
-                            <Banknote size={18} />
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-9 w-9 border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" 
+                            onClick={() => setIsArqueoOpen(true)}
+                            title="Arqueo de Caja: Ver totales y cerrar turno"
+                        >
+                            <LogOut size={18} />
                         </Button>
                     </div>
                 </div>
@@ -704,10 +711,9 @@ export default function POSView() {
                             <option value="">Consumidor Final</option>
                             {customers.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                         </select>
-                        <select className="w-full border rounded-md p-2 text-sm" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                            <option value="cash">Efectivo</option>
-                            <option value="card">Tarjeta</option>
-                            <option value="transfer">Transferencia</option>
+                        <select className="w-full border rounded-md p-2 text-sm font-bold bg-slate-50" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                            <option value="cash">💵 Efectivo</option>
+                            <option value="transfer">🏦 Transferencia / QR</option>
                         </select>
                         <input type="number" className="w-full border rounded-md p-2 text-sm" placeholder="Monto Abona" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
                         
