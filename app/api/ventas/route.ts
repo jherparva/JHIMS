@@ -3,11 +3,12 @@ import { connectDB } from "@/lib/db/mongodb"
 import Sale from "@/lib/db/models/Sale"
 import Product from "@/lib/db/models/Product"
 import Company from "@/lib/db/models/Company"
+import CashSession from "@/lib/db/models/CashSession"
 import { withSessionContext } from "@/lib/api-wrapper"
 
 export const POST = withSessionContext(async (req: NextRequest, context: any) => {
     // Lista para seguimiento de productos modificados para Rollback manual
-    const modifiedProducts: { id: string, quantity: number }[] = []
+    const modifiedProducts: { id: string, quantity: number, variantId?: string }[] = []
     
     try {
         await connectDB()
@@ -31,19 +32,29 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             if (!product) {
                 throw new Error(`Producto no encontrado: ${item.product.name}`)
             }
-            if (product.stock < item.quantity) {
-                throw new Error(`Stock insuficiente para: ${product.name}`)
+
+            if (item.variantId) {
+                // Descontar de variante específica
+                const variant = (product as any).variants.find((v: any) => v._id.toString() === item.variantId)
+                if (!variant) throw new Error(`Variante no encontrada para: ${product.name}`)
+                if (variant.stock < item.quantity) throw new Error(`Stock insuficiente para variante ${variant.name}`)
+                
+                variant.stock -= item.quantity
+                product.markModified('variants')
+                modifiedProducts.push({ id: product._id as any, quantity: item.quantity, variantId: item.variantId })
+            } else {
+                // Descontar de stock general
+                if (product.stock < item.quantity) {
+                    throw new Error(`Stock insuficiente para: ${product.name}`)
+                }
+                product.stock -= item.quantity
+                modifiedProducts.push({ id: product._id as any, quantity: item.quantity })
             }
             
-            // Actualizar Stock
-            product.stock -= item.quantity
             await product.save()
-            
-            // Guardar para posible rollback
-            modifiedProducts.push({ id: product._id as any, quantity: item.quantity })
         }
 
-        // 2. Obtener siguiente número consecutivo con lógica de reintento simple para concurrencia
+        // 2. Obtener siguiente número consecutivo
         const lastSale = await Sale.findOne({ companyId: context.companyId })
             .sort({ sequential: -1 })
             .select('sequential')
@@ -57,9 +68,11 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             customer: customer || null,
             items: items.map((i: any) => ({
                 product: i.product._id,
+                variantId: i.variantId || null,
+                variantName: i.variantName || null,
                 quantity: i.quantity,
-                price: i.product.salePrice,
-                subtotal: i.product.salePrice * i.quantity
+                price: i.variantId ? i.variantPrice : i.product.salePrice,
+                subtotal: (i.variantId ? i.variantPrice : i.product.salePrice) * i.quantity
             })),
             total,
             amountPaid,
@@ -76,12 +89,33 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             sequential: nextSequential
         })
 
-        // 4. Actualizar contadores de uso del Plan
+        // 4. ACTUALIZAR SESIÓN DE CAJA (SI EXISTE)
+        try {
+            const activeSession = await CashSession.findOne({
+                userId: context.userId,
+                status: 'open'
+            })
+
+            if (activeSession) {
+                activeSession.totalSales += total
+                
+                // Actualizar por método de pago
+                if (paymentMethod === 'cash') activeSession.totalCashSales += total
+                else if (paymentMethod === 'card') activeSession.totalCardSales += total
+                else if (paymentMethod === 'transfer') activeSession.totalTransferSales += total
+                
+                await activeSession.save()
+            }
+        } catch (cajaErr) {
+            console.error("Error updating cash session totals:", cajaErr)
+            // No bloqueamos la venta por un error en arqueo
+        }
+
+        // 5. Actualizar contadores de uso del Plan
         try {
             await (Company as any).incrementUsage(context.companyId, 'sales')
         } catch (usageErr) {
             console.error("Error updating usage stats (Sales):", usageErr)
-            // No bloqueamos la venta por un error en estadísticas de uso
         }
 
         return NextResponse.json(sale, { status: 201 })
@@ -89,11 +123,18 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
     } catch (error: any) {
         console.error("SALE PROCESSING FATAL ERROR:", error)
         
-        // 🚨 ROLLBACK MANUAL DE STOCK
+        // 🚨 ROLLBACK MANUAL DE STOCK (Soporta Variantes)
         if (modifiedProducts.length > 0) {
             console.log("Restaurando stock por fallo en transacción...")
             for (const mod of modifiedProducts) {
-                await Product.findByIdAndUpdate(mod.id, { $inc: { stock: mod.quantity } })
+                if (mod.variantId) {
+                    await Product.updateOne(
+                        { _id: mod.id, "variants._id": mod.variantId },
+                        { $inc: { "variants.$.stock": mod.quantity } }
+                    )
+                } else {
+                    await Product.findByIdAndUpdate(mod.id, { $inc: { stock: mod.quantity } })
+                }
             }
         }
 

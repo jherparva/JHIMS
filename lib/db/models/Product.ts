@@ -1,6 +1,14 @@
 import mongoose, { Schema, type Document } from "mongoose"
 import { multiTenancyPlugin } from "../multi-tenancy-plugin"
 
+export interface IVariant {
+    _id?: any
+    name: string
+    sku: string
+    stock: number
+    salePrice: number
+}
+
 export interface IProduct extends Document {
     companyId: mongoose.Types.ObjectId
     sku: string
@@ -14,6 +22,8 @@ export interface IProduct extends Document {
     supplier?: mongoose.Types.ObjectId
     imageUrl?: string
     isActive: boolean
+    hasVariants: boolean
+    variants: IVariant[]
     createdAt: Date
     updatedAt: Date
 }
@@ -79,6 +89,16 @@ const ProductSchema = new Schema<IProduct>(
             type: Boolean,
             default: true,
         },
+        hasVariants: {
+            type: Boolean,
+            default: false,
+        },
+        variants: [{
+            name: { type: String, required: true },
+            sku: { type: String, required: true },
+            stock: { type: Number, default: 0 },
+            salePrice: { type: Number, default: 0 }
+        }]
     },
     {
         timestamps: true,

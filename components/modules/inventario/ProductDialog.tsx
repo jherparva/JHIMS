@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
-import { Loader2, Image as ImageIcon, Globe, Upload, Trash2, Scan } from "lucide-react"
+import { Loader2, Image as ImageIcon, Globe, Upload, Trash2, Scan, Plus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { cn } from "@/lib/utils"
 
 const PREDEFINED_IMAGES = [
     { name: "Alimentos", url: "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=800&q=80" },
@@ -35,6 +36,9 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const { register, handleSubmit, reset, setValue, watch } = useForm()
 
+    const [variants, setVariants] = useState<any[]>([])
+    const [hasVariants, setHasVariants] = useState(false)
+
     const currentImageUrl = watch("imageUrl")
 
     useEffect(() => {
@@ -55,9 +59,15 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                 const img = product.imageUrl || product.image || ""
                 setValue("imageUrl", img)
                 setImagePreview(img || null)
+                
+                // Cargar Variantes
+                setHasVariants(product.hasVariants || false)
+                setVariants(product.variants || [])
             } else {
                 reset()
                 setImagePreview(null)
+                setHasVariants(false)
+                setVariants([])
             }
         }
     }, [open, product, setValue, reset])
@@ -87,6 +97,20 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
         }
     }
 
+    const onAddVariant = () => {
+        setVariants([...variants, { name: "", sku: "", stock: 0, salePrice: watch("salePrice") || 0 }])
+    }
+
+    const onRemoveVariant = (index: number) => {
+        setVariants(variants.filter((_, i) => i !== index))
+    }
+
+    const onUpdateVariant = (index: number, field: string, value: any) => {
+        const next = [...variants]
+        next[index] = { ...next[index], [field]: value }
+        setVariants(next)
+    }
+
     const onSubmit = async (data: any) => {
         setLoading(true)
         try {
@@ -100,7 +124,9 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                 costPrice: parseFloat(data.costPrice || 0),
                 stock: parseInt(data.stock || 0),
                 minStock: parseInt(data.minStock || 0),
-                supplierId: data.supplierId === "none" ? null : data.supplierId
+                supplierId: data.supplierId === "none" ? null : data.supplierId,
+                hasVariants,
+                variants: hasVariants ? variants : []
             }
 
             const response = await fetch(url, {
@@ -328,9 +354,74 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-2">
+                    {/* SECCIÓN DE VARIANTES */}
+                    <div className="space-y-4 pt-2 border-t mt-4">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-0.5">
+                                <Label className="text-base font-bold">Manejar Variaciones</Label>
+                                <p className="text-[10px] text-slate-500 font-medium">Activa si este producto tiene tallas, colores o versiones</p>
+                            </div>
+                            <div 
+                                onClick={() => setHasVariants(!hasVariants)}
+                                className={cn(
+                                    "w-12 h-6 rounded-full p-1 cursor-pointer transition-colors",
+                                    hasVariants ? "bg-violet-600" : "bg-slate-200"
+                                )}
+                            >
+                                <div className={cn(
+                                    "w-4 h-4 bg-white rounded-full transition-transform",
+                                    hasVariants ? "translate-x-6" : "translate-x-0"
+                                )} />
+                            </div>
+                        </div>
+
+                        {hasVariants && (
+                            <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-black uppercase text-slate-500 tracking-tight">Lista de Variaciones</h4>
+                                    <Button type="button" variant="outline" size="sm" onClick={onAddVariant} className="h-8 text-[10px] font-bold uppercase gap-1 border-violet-200 text-violet-700 bg-violet-50 hover:bg-violet-100">
+                                        <Plus size={12} /> Añadir Variación
+                                    </Button>
+                                </div>
+                                
+                                {variants.length === 0 ? (
+                                    <p className="text-[10px] text-center py-4 italic text-slate-400">Pulsa "Añadir Variación" para comenzar</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {variants.map((v, i) => (
+                                            <div key={i} className="grid grid-cols-12 gap-2 items-end bg-white p-2 rounded-xl border shadow-sm group">
+                                                <div className="col-span-4 space-y-1">
+                                                    <Label className="text-[9px] uppercase font-bold text-slate-400 ml-1">Talla/Color</Label>
+                                                    <Input className="h-8 text-xs font-medium" value={v.name} onChange={(e) => onUpdateVariant(i, 'name', e.target.value)} placeholder="Ej: Rojo" />
+                                                </div>
+                                                <div className="col-span-3 space-y-1">
+                                                    <Label className="text-[9px] uppercase font-bold text-slate-400 ml-1">SKU</Label>
+                                                    <Input className="h-8 text-xs font-mono" value={v.sku} onChange={(e) => onUpdateVariant(i, 'sku', e.target.value)} placeholder="CB01" />
+                                                </div>
+                                                <div className="col-span-2 space-y-1">
+                                                    <Label className="text-[9px] uppercase font-bold text-slate-400 ml-1">Precio</Label>
+                                                    <Input type="number" className="h-8 text-xs font-black" value={v.salePrice} onChange={(e) => onUpdateVariant(i, 'salePrice', parseFloat(e.target.value))} />
+                                                </div>
+                                                <div className="col-span-2 space-y-1">
+                                                    <Label className="text-[9px] uppercase font-bold text-slate-400 ml-1">Stock</Label>
+                                                    <Input type="number" className="h-8 text-xs font-bold" value={v.stock} onChange={(e) => onUpdateVariant(i, 'stock', parseInt(e.target.value))} />
+                                                </div>
+                                                <div className="col-span-1">
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => onRemoveVariant(i)} className="h-8 w-8 text-rose-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg">
+                                                        <Trash2 size={14} />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t mt-4">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90">
+                        <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90 min-w-[120px]">
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {product ? "Guardar Cambios" : "Crear Producto"}
                         </Button>

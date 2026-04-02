@@ -40,7 +40,7 @@ export const PUT = withSessionContext(async (
         await connectDB()
 
         const body = await req.json()
-        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description } = body
+        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description, hasVariants, variants } = body
 
         // Verificar SKU único (excepto el producto actual)
         if (sku) {
@@ -63,12 +63,14 @@ export const PUT = withSessionContext(async (
                 sku,
                 category: categoryId || null,
                 supplier: supplierId || null,
-                purchasePrice: costPrice,
+                purchasePrice: costPrice || 0,
                 salePrice,
-                stock,
-                minStock,
+                stock: stock || 0,
+                minStock: minStock || 0,
                 description,
                 imageUrl: body.imageUrl || body.image || null,
+                hasVariants,
+                variants: variants || []
             },
             { new: true, runValidators: true }
         )

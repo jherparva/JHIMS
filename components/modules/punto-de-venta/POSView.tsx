@@ -8,6 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useDebounce } from "@/hooks/useDebounce"
 import { cn } from "@/lib/utils"
+import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
 
 interface Product {
     _id: string
@@ -15,6 +17,8 @@ interface Product {
     salePrice: number
     stock: number
     sku: string
+    hasVariants: boolean
+    variants?: any[]
 }
 
 interface CartItem {
@@ -40,10 +44,16 @@ export default function POSView() {
     const [customers, setCustomers] = useState<{_id: string, name: string}[]>([])
     const [selectedCustomer, setSelectedCustomer] = useState("")
     const [amountPaid, setAmountPaid] = useState<string>("")
+    const router = useRouter()
     const [currentUser, setCurrentUser] = useState<any>(null)
     const [isQuickEditOpen, setIsQuickEditOpen] = useState(false)
     const [editingProduct, setEditingProduct] = useState<Product | null>(null)
     const [quickFormData, setQuickFormData] = useState({ name: "", salePrice: 0 })
+    const [activeSession, setActiveSession] = useState<any>(null)
+    const [isVariantSelectorOpen, setIsVariantSelectorOpen] = useState(false)
+    const [selectingProduct, setSelectingProduct] = useState<Product | null>(null)
+    const [isOpeningBoxOpen, setIsOpeningBoxOpen] = useState(false)
+    const [openingAmount, setOpeningAmount] = useState("0")
 
     const fetchUser = async () => {
         try {
@@ -55,12 +65,28 @@ export default function POSView() {
         } catch (e) {}
     }
 
+    const fetchActiveSession = async () => {
+        try {
+            const res = await fetch("/api/caja/session")
+            if (res.ok) {
+                const data = await res.json()
+                setActiveSession(data.activeSession)
+                if (!data.activeSession) {
+                    setIsOpeningBoxOpen(true)
+                }
+            }
+        } catch (e) {
+            console.error("Error al verificar sesión de caja")
+        }
+    }
+
     useEffect(() => {
         fetchProducts()
         fetchCustomers()
         fetchCompanyInfo()
         fetchStats()
         fetchUser()
+        fetchActiveSession()
     }, [])
 
     const fetchStats = async () => {
@@ -108,29 +134,56 @@ export default function POSView() {
         }
     }
 
-    const addToCart = (product: Product) => {
-        const existingItem = cart.find(item => item.product._id === product._id)
+    const addToCart = (product: Product, variant?: any) => {
+        if (product.hasVariants && !variant && (product as any).variants?.length > 0) {
+            setSelectingProduct(product)
+            setIsVariantSelectorOpen(true)
+            return
+        }
+
+        const cartItemId = variant ? `${product._id}-${variant._id}` : product._id
+        const existingItem = cart.find(item => 
+            variant ? (item as any).variantId === variant._id : item.product._id === product._id
+        )
+
+        const maxStock = variant ? variant.stock : product.stock
 
         if (existingItem) {
-            if (existingItem.quantity >= product.stock) {
+            if (existingItem.quantity >= maxStock) {
                 toast.error("Stock insuficiente")
                 return
             }
-            setCart(cart.map(item =>
-                item.product._id === product._id
-                    ? { ...item, quantity: item.quantity + 1 }
-                    : item
-            ))
+            setCart(cart.map(item => {
+                const isMatch = variant 
+                    ? (item as any).variantId === variant._id 
+                    : item.product._id === product._id
+                
+                return isMatch ? { ...item, quantity: item.quantity + 1 } : item
+            }))
         } else {
-            setCart([...cart, { product, quantity: 1 }])
+            const newItem: any = { 
+                product, 
+                quantity: 1,
+                variantId: variant?._id,
+                variantName: variant?.name,
+                variantPrice: variant?.salePrice || product.salePrice
+            }
+            setCart([...cart, newItem])
+            setIsVariantSelectorOpen(false)
         }
     }
 
-    const updateQuantity = (productId: string, delta: number) => {
+    const updateQuantity = (cartItemKey: string, delta: number) => {
         setCart(cart.map(item => {
-            if (item.product._id === productId) {
+            const key = (item as any).variantId ? `${item.product._id}-${(item as any).variantId}` : item.product._id
+            
+            if (key === cartItemKey) {
+                const maxStock = (item as any).variantId 
+                    ? (item.product as any).variants.find((v:any) => v._id === (item as any).variantId)?.stock || item.product.stock
+                    : item.product.stock
+
                 const newQuantity = item.quantity + delta
-                if (newQuantity > item.product.stock) {
+                if (newQuantity > maxStock) {
                     toast.error("Stock insuficiente")
                     return item
                 }
@@ -140,15 +193,26 @@ export default function POSView() {
         }).filter(item => item.quantity > 0))
     }
 
-    const removeFromCart = (productId: string) => {
-        setCart(cart.filter(item => item.product._id !== productId))
+    const removeFromCart = (cartItemKey: string) => {
+        setCart(cart.filter(item => {
+            const key = (item as any).variantId ? `${item.product._id}-${(item as any).variantId}` : item.product._id
+            return key !== cartItemKey
+        }))
     }
 
     const getTotal = () => {
-        return cart.reduce((sum, item) => sum + (item.product.salePrice * item.quantity), 0)
+        return cart.reduce((sum, item) => {
+            const price = (item as any).variantPrice || item.product.salePrice
+            return sum + (price * item.quantity)
+        }, 0)
     }
 
     const handleCheckout = async () => {
+        if (!activeSession) {
+            toast.error("Debes abrir caja antes de vender")
+            setIsOpeningBoxOpen(true)
+            return
+        }
         if (cart.length === 0) {
             toast.error("El carrito está vacío")
             return
@@ -248,8 +312,85 @@ export default function POSView() {
         toast.info("Comando enviado a la impresora para abrir el cajón");
     }
 
+    const handleOpenBox = async () => {
+        try {
+            const res = await fetch("/api/caja/session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ openingAmount: Number(openingAmount) })
+            })
+            if (res.ok) {
+                const session = await res.json()
+                setActiveSession(session)
+                setIsOpeningBoxOpen(false)
+                toast.success("Caja abierta con éxito")
+                fetchStats()
+            } else {
+                toast.error("Error al abrir caja")
+            }
+        } catch (e) {
+            toast.error("Error de conexión")
+        }
+    }
+
+    const handleCloseBox = async () => {
+        try {
+            const res = await fetch("/api/caja/session", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ closingAmount: Number(physicalCash), notes: "Cierre de turno" })
+            })
+            if (res.ok) {
+                toast.success("Caja cerrada exitosamente")
+                setActiveSession(null)
+                setIsArqueoOpen(false)
+                setIsOpeningBoxOpen(true)
+                setPhysicalCash("") // Reset
+            } else {
+                toast.error("Error al cerrar caja")
+            }
+        } catch (e) {
+            toast.error("Error de conexión")
+        }
+    }
+
     return (
         <div className={styles.container}>
+            {/* Modal de Apertura de Caja */}
+            <Dialog open={isOpeningBoxOpen} onOpenChange={(open) => {
+                if (activeSession) setIsOpeningBoxOpen(open)
+            }}>
+                <DialogContent className="max-w-sm bg-white rounded-3xl p-8 shadow-2xl border-none">
+                    <div className="text-center space-y-6">
+                        <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                            <Banknote size={40} />
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter italic">Apertura de Caja</h2>
+                            <p className="text-slate-500 text-sm font-medium">Inicia tu turno con el saldo base</p>
+                        </div>
+                        <div className="space-y-2 text-left">
+                            <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Saldo Inicial</label>
+                            <input 
+                                type="number" 
+                                className="w-full h-16 border-2 border-slate-100 bg-slate-50 rounded-2xl px-6 text-3xl font-black text-slate-800 focus:border-emerald-500 transition-all outline-none"
+                                value={openingAmount}
+                                onChange={(e) => setOpeningAmount(e.target.value)}
+                                autoFocus
+                            />
+                        </div>
+                        <Button 
+                            className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-emerald-200"
+                            onClick={handleOpenBox}
+                        >
+                            INICIAR TURNO
+                        </Button>
+                        <Button variant="ghost" className="text-slate-400 text-xs font-bold" onClick={() => router.push('/dashboard')}>
+                            <LogOut size={14} className="mr-2" /> Salir al Dashboard
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             <div className={styles.productsSection}>
                 <div className={styles.searchBar}>
                     <Search size={20} className="text-gray-400" />
@@ -326,20 +467,32 @@ export default function POSView() {
                     {cart.length === 0 ? (
                         <div className="text-center py-12 text-gray-500">El carrito está vacío</div>
                     ) : (
-                        cart.map((item) => (
-                            <div key={item.product._id} className={styles.cartItem}>
-                                <div className={styles.itemInfo}>
-                                    <div className={styles.itemName}>{item.product.name}</div>
-                                    <div className={styles.itemPrice}>${item.product.salePrice.toLocaleString()} x {item.quantity}</div>
+                        cart.map((item) => {
+                            const key = (item as any).variantId ? `${item.product._id}-${(item as any).variantId}` : item.product._id
+                            const price = (item as any).variantPrice || item.product.salePrice
+                            
+                            return (
+                                <div key={key} className={styles.cartItem}>
+                                    <div className={styles.itemInfo}>
+                                        <div className={styles.itemName}>
+                                            {item.product.name}
+                                            {(item as any).variantName && (
+                                                <span className="ml-2 text-[10px] bg-slate-100 px-1.5 py-0.5 rounded uppercase font-black text-slate-500">
+                                                    {(item as any).variantName}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className={styles.itemPrice}>${price.toLocaleString()} x {item.quantity}</div>
+                                    </div>
+                                    <div className={styles.itemControls}>
+                                        <button className={styles.quantityBtn} onClick={() => updateQuantity(key, -1)}><Minus size={16} /></button>
+                                        <span className={styles.quantity}>{item.quantity}</span>
+                                        <button className={styles.quantityBtn} onClick={() => updateQuantity(key, 1)}><Plus size={16} /></button>
+                                        <button className={styles.quantityBtn} onClick={() => removeFromCart(key)}><Trash2 size={16} /></button>
+                                    </div>
                                 </div>
-                                <div className={styles.itemControls}>
-                                    <button className={styles.quantityBtn} onClick={() => updateQuantity(item.product._id, -1)}><Minus size={16} /></button>
-                                    <span className={styles.quantity}>{item.quantity}</span>
-                                    <button className={styles.quantityBtn} onClick={() => updateQuantity(item.product._id, 1)}><Plus size={16} /></button>
-                                    <button className={styles.quantityBtn} onClick={() => removeFromCart(item.product._id)}><Trash2 size={16} /></button>
-                                </div>
-                            </div>
-                        ))
+                            )
+                        })
                     )}
                 </div>
 
@@ -489,25 +642,49 @@ export default function POSView() {
 
             <Dialog open={isArqueoOpen} onOpenChange={setIsArqueoOpen}>
                 <DialogContent className="max-w-md bg-white">
-                    <DialogHeader><DialogTitle className="flex items-center gap-2 font-black italic uppercase">Arqueo de Caja</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle className="flex items-center gap-2 font-black italic uppercase text-slate-800">Arqueo de Caja (Cierre)</DialogTitle></DialogHeader>
                     <div className="space-y-6 pt-4">
-                        <div className="p-4 bg-slate-50 rounded-2xl border space-y-3 font-bold">
-                            <div className="flex justify-between"><span>Ventas Sistema:</span><span>${(stats?.todaySales || 0).toLocaleString()}</span></div>
-                            <div className="flex justify-between text-emerald-700"><span>Esperado:</span><span>${(stats?.todaySales || 0).toLocaleString()}</span></div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-slate-50 rounded-2xl border font-bold">
+                                <p className="text-[10px] text-slate-400 uppercase">Base Inicial</p>
+                                <p className="text-xl text-slate-800">${(activeSession?.openingAmount || 0).toLocaleString()}</p>
+                            </div>
+                            <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100 font-bold">
+                                <p className="text-[10px] text-emerald-600 uppercase">Ventas Efectivo</p>
+                                <p className="text-xl text-emerald-700">${(activeSession?.totalCashSales || 0).toLocaleString()}</p>
+                            </div>
                         </div>
+
+                        <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100 text-center font-bold">
+                            <p className="text-xs text-blue-600 uppercase mb-1">Monto Esperado en Caja</p>
+                            <p className="text-4xl text-blue-800">${((activeSession?.openingAmount || 0) + (activeSession?.totalCashSales || 0)).toLocaleString()}</p>
+                        </div>
+
                         <div className="space-y-2">
-                            <label className="text-xs font-black uppercase text-slate-500">Efectivo Físico</label>
-                            <input type="number" className="w-full h-16 border-2 rounded-2xl px-4 text-3xl font-black" value={physicalCash} onChange={(e) => setPhysicalCash(e.target.value)} />
+                            <label className="text-xs font-black uppercase text-slate-500 ml-1">Efectivo Físico Detectado</label>
+                            <input 
+                                type="number" 
+                                className="w-full h-16 border-2 border-slate-200 rounded-2xl px-4 text-3xl font-black focus:border-slate-800 outline-none" 
+                                value={physicalCash} 
+                                onChange={(e) => setPhysicalCash(e.target.value)} 
+                            />
                         </div>
+
                         {physicalCash && (
-                            <div className={cn("p-4 rounded-2xl border text-center font-bold", Number(physicalCash) - (stats?.todaySales || 0) < 0 ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700")}>
+                            <div className={cn(
+                                "p-4 rounded-2xl border text-center font-bold", 
+                                Number(physicalCash) - ((activeSession?.openingAmount || 0) + (activeSession?.totalCashSales || 0)) === 0 
+                                    ? "bg-emerald-100 border-emerald-200 text-emerald-700" 
+                                    : "bg-rose-50 border-rose-100 text-rose-700"
+                            )}>
                                 <p className="text-xs uppercase">Diferencia</p>
-                                <p className="text-3xl">${(Number(physicalCash) - (stats?.todaySales || 0)).toLocaleString()}</p>
+                                <p className="text-3xl">${(Number(physicalCash) - ((activeSession?.openingAmount || 0) + (activeSession?.totalCashSales || 0))).toLocaleString()}</p>
                             </div>
                         )}
-                        <div className="grid grid-cols-2 gap-3">
-                            <Button variant="outline" className="h-12" onClick={() => setIsArqueoOpen(false)}>Cancelar</Button>
-                            <Button className="h-12 bg-slate-900 text-white" onClick={() => { toast.success("Cierre procesado"); setIsArqueoOpen(false); }}>Cerrar Turno</Button>
+
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <Button variant="outline" className="h-12 border-2 rounded-xl" onClick={() => setIsArqueoOpen(false)}>Cancelar</Button>
+                            <Button className="h-12 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black" onClick={handleCloseBox}>FINALIZAR TURNO</Button>
                         </div>
                     </div>
                 </DialogContent>
@@ -545,6 +722,33 @@ export default function POSView() {
                                 Guardar
                             </Button>
                         </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isVariantSelectorOpen} onOpenChange={setIsVariantSelectorOpen}>
+                <DialogContent className="max-w-sm bg-white rounded-3xl p-6 border-none">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black text-slate-800 tracking-tight uppercase italic underline decoration-violet-500 underline-offset-4">Seleccionar Opción</DialogTitle>
+                    </DialogHeader>
+                    <div className="pt-4 space-y-3">
+                        <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide px-1">Opciones disponibles para: <span className="text-slate-900">{selectingProduct?.name}</span></p>
+                        <div className="grid grid-cols-1 gap-2">
+                            {(selectingProduct as any)?.variants?.map((variant: any) => (
+                                <button 
+                                    key={variant._id}
+                                    onClick={() => selectingProduct && addToCart(selectingProduct, variant)}
+                                    className="flex justify-between items-center p-4 bg-slate-50 hover:bg-violet-50 hover:border-violet-200 border-2 border-transparent rounded-2xl transition-all group"
+                                >
+                                    <div className="text-left">
+                                        <p className="font-black text-slate-800 uppercase group-hover:text-violet-700">{variant.name}</p>
+                                        <p className="text-[10px] text-slate-500">Stock: {variant.stock} | SKU: {variant.sku}</p>
+                                    </div>
+                                    <p className="text-lg font-black text-emerald-600">${variant.salePrice.toLocaleString()}</p>
+                                </button>
+                            ))}
+                        </div>
+                        <Button variant="ghost" className="w-full mt-4 text-slate-400 font-bold" onClick={() => setIsVariantSelectorOpen(false)}>Cancelar</Button>
                     </div>
                 </DialogContent>
             </Dialog>

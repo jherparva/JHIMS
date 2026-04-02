@@ -3,6 +3,8 @@ import { multiTenancyPlugin } from "../multi-tenancy-plugin"
 
 export interface ISaleItem {
     product: mongoose.Types.ObjectId
+    variantId?: string
+    variantName?: string
     quantity: number
     price: number
     subtotal: number
@@ -31,6 +33,8 @@ export interface ISale extends Document {
 
 const SaleItemSchema = new Schema({
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+    variantId: { type: String },
+    variantName: { type: String },
     quantity: { type: Number, required: true, min: 1 },
     price: { type: Number, required: true, min: 0 },
     subtotal: { type: Number, required: true, min: 0 }
