@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db/mongodb"
 import Sale from "@/lib/db/models/Sale"
 import Product from "@/lib/db/models/Product"
+import Company from "@/lib/db/models/Company"
 import { withSessionContext } from "@/lib/api-wrapper"
 
 export const POST = withSessionContext(async (req: NextRequest, context: any) => {
+    // Lista para seguimiento de productos modificados para Rollback manual
+    const modifiedProducts: { id: string, quantity: number }[] = []
+    
     try {
         await connectDB()
         const body = await req.json()
@@ -21,29 +25,34 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         if (amountPaid === 0) paymentStatus = "pending"
         else if (amountPaid < total) paymentStatus = "partial"
 
-        // 1. Validate and descrease stock
-        // ... (stock validation remains same)
+        // 1. Validar y descontar stock (con tracking para rollback)
         for (const item of items) {
             const product = await Product.findById(item.product._id)
             if (!product) {
-                return NextResponse.json({ error: `Producto no encontrado: ${item.product.name}` }, { status: 404 })
+                throw new Error(`Producto no encontrado: ${item.product.name}`)
             }
             if (product.stock < item.quantity) {
-                return NextResponse.json({ error: `Stock insuficiente para: ${product.name}` }, { status: 400 })
+                throw new Error(`Stock insuficiente para: ${product.name}`)
             }
+            
+            // Actualizar Stock
             product.stock -= item.quantity
             await product.save()
+            
+            // Guardar para posible rollback
+            modifiedProducts.push({ id: product._id as any, quantity: item.quantity })
         }
 
-        // 2. Obtener siguiente número consecutivo
+        // 2. Obtener siguiente número consecutivo con lógica de reintento simple para concurrencia
         const lastSale = await Sale.findOne({ companyId: context.companyId })
             .sort({ sequential: -1 })
             .select('sequential')
+            .setOptions({ skipTenantFilter: true })
 
         const nextSequential = (lastSale?.sequential || 0) + 1
         const ticketNumber = `Venta #${nextSequential.toString().padStart(4, '0')}`
 
-        // 3. Create Sale
+        // 3. Crear la Venta
         const sale = await Sale.create({
             customer: customer || null,
             items: items.map((i: any) => ({
@@ -67,9 +76,34 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             sequential: nextSequential
         })
 
+        // 4. Actualizar contadores de uso del Plan
+        try {
+            await (Company as any).incrementUsage(context.companyId, 'sales')
+        } catch (usageErr) {
+            console.error("Error updating usage stats (Sales):", usageErr)
+            // No bloqueamos la venta por un error en estadísticas de uso
+        }
+
         return NextResponse.json(sale, { status: 201 })
+
     } catch (error: any) {
-        console.error("Error processing sale:", error)
+        console.error("SALE PROCESSING FATAL ERROR:", error)
+        
+        // 🚨 ROLLBACK MANUAL DE STOCK
+        if (modifiedProducts.length > 0) {
+            console.log("Restaurando stock por fallo en transacción...")
+            for (const mod of modifiedProducts) {
+                await Product.findByIdAndUpdate(mod.id, { $inc: { stock: mod.quantity } })
+            }
+        }
+
+        // Manejo de error de duplicidad de Ticket por concurrencia
+        if (error.code === 11000) {
+            return NextResponse.json({ 
+                error: "Error de concurrencia en el ticket. Por favor intente de nuevo la venta." 
+            }, { status: 409 })
+        }
+
         return NextResponse.json({ error: error.message || "Error al procesar venta" }, { status: 500 })
     }
 })

@@ -68,6 +68,11 @@ const SaleSchema = new Schema<ISale>(
     { timestamps: true }
 )
 
+// Índices de Seguridad
+SaleSchema.index({ companyId: 1, sequential: 1 }, { unique: true })
+SaleSchema.index({ companyId: 1, createdAt: -1 })
+SaleSchema.index({ customer: 1 })
+
 SaleSchema.plugin(multiTenancyPlugin)
 
 export default mongoose.models.Sale || mongoose.model<ISale>("Sale", SaleSchema)

@@ -8,6 +8,7 @@ import { connectDB } from "@/lib/db/mongodb"
 import Product from "@/lib/db/models/Product"
 import Category from "@/lib/db/models/Category"
 import Supplier from "@/lib/db/models/Supplier"
+import Company from "@/lib/db/models/Company"
 import { withSessionContext } from "@/lib/api-wrapper"
 
 // =============================================================================
@@ -85,7 +86,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             name,
             sku,
             category: categoryId, // Mapeado de categoryId a category
-            supplier: supplierId || null,
+            supplier: supplierId === 'none' ? null : supplierId,
             purchasePrice: costPrice || 0, // Mapeado de costPrice a purchasePrice
             salePrice,
             stock: stock || 0,
@@ -94,6 +95,13 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             imageUrl: body.imageUrl || body.image || "",
             companyId: context.companyId, // <--- REQUERIDO: Inyectar ID de sesión
         })
+
+        // 3. Actualizar contador de productos en el uso del Plan
+        try {
+            await (Company as any).incrementUsage(context.companyId, 'products')
+        } catch (usageErr) {
+            console.error("Error updating usage stats (Products):", usageErr)
+        }
 
         return NextResponse.json(product, { status: 201 })
     } catch (error: any) {

@@ -242,4 +242,22 @@ CompanySchema.methods.resetMonthlySales = function () {
     }
 }
 
+// MÉTODO ESTÁTICO: Incrementar uso de forma segura
+CompanySchema.statics.incrementUsage = async function(companyId, type: 'users' | 'products' | 'sales', amount: number = 1) {
+    const fieldMap = {
+        'users': 'usage.currentUsers',
+        'products': 'usage.currentProducts',
+        'sales': 'usage.currentSalesThisMonth'
+    };
+    
+    const updateField = fieldMap[type];
+    if (!updateField) return null;
+
+    return await this.findByIdAndUpdate(
+        companyId,
+        { $inc: { [updateField]: amount } },
+        { new: true }
+    ).setOptions({ skipTenantFilter: true });
+}
+
 export default mongoose.models.Company || mongoose.model<ICompany>("Company", CompanySchema)

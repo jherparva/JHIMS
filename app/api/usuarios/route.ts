@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { connectDB } from "@/lib/db/mongodb"
 import User from "@/lib/db/models/User"
+import Company from "@/lib/db/models/Company"
 import { withSessionContext } from "@/lib/api-wrapper"
 
 export const GET = withSessionContext(async (req: NextRequest, context: any) => {
@@ -71,9 +72,15 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             role: role || "seller",
             permissions: role === "seller" ? (permissions || []) : [],
             // ✅ Heredar la empresa del admin que está creando este usuario
-            // Esto garantiza que el vendedor comparte el mismo inventario, ventas y reportes
             companyId: context.companyId,
         })
+
+        // ✅ Actualizar contador de usuarios en el uso del Plan
+        try {
+            await (Company as any).incrementUsage(context.companyId, 'users')
+        } catch (usageErr) {
+            console.error("Error updating usage stats (Users):", usageErr)
+        }
 
         const userResponse = user.toObject()
         delete userResponse.password
