@@ -5,6 +5,7 @@ const API_CACHE = "jhims-api-v2"
 // Archivos estáticos que siempre deben estar cacheados
 const STATIC_ASSETS = [
   "/",
+  "/punto-de-venta",
   "/inicio-sesion",
   "/dashboard",
   "/productos",
@@ -12,9 +13,7 @@ const STATIC_ASSETS = [
   "/categorias",
   "/proveedores",
   "/usuarios",
-  "/placeholder-logo.png",
-  "/placeholder-logo.svg",
-  "/placeholder-user.jpg",
+  "/jhims-logo.png",
   "/manifest.json"
 ]
 

@@ -1,11 +1,7 @@
-// =============================================================================
-// LAYOUT PRINCIPAL - JHIMS Inventory
-// =============================================================================
-// Layout raíz con tema, metadatos y notificaciones globales
-// =============================================================================
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { PWAInstall } from "@/components/PWAInstall";
 
 // Fuente tipográfica para la aplicación
 const inter = Inter({ subsets: ["latin"] });
@@ -14,12 +10,13 @@ const inter = Inter({ subsets: ["latin"] });
 // METADATOS
 // =============================================================================
 export const metadata: Metadata = {
-    title: "JHIMS Inventory",
-    description: "Sistema de Gestión de Inventario",
+    title: "JHIMS POS Profesional",
+    description: "Sistema de Punto de Venta con Soporte Offline",
+    manifest: "/manifest.json",
     icons: {
-        icon: '/icon1.png',        // Icono pestaña navegador
-        shortcut: '/icon1.png',    // Icono acceso directo
-        apple: '/icon1.png',       // Icono dispositivos Apple
+        icon: '/icon1.png',
+        shortcut: '/icon1.png',
+        apple: '/icon1.png',
     }
 };
 
@@ -54,13 +51,23 @@ export default function RootLayout({
                 >
                     {/* children: Contenido dinámico de cada página */}
                     {children}
-                    
-                    {/* 
-                      Toaster: Sistema de notificaciones emergentes
-                      - position="top-center": Notificaciones arriba centro
-                      - richColors: Colores vibrantes
-                    */}
+                    <PWAInstall />
                     <Toaster position="top-center" richColors />
+                    
+                    {/* Registro de Service Worker para Modo Offline y App en PC */}
+                    <script dangerouslySetInnerHTML={{
+                        __html: `
+                        if ('serviceWorker' in navigator) {
+                            window.addEventListener('load', function() {
+                                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                                    console.log('SW registrado con éxito:', registration.scope);
+                                }, function(err) {
+                                    console.log('Fallo registro SW:', err);
+                                });
+                            });
+                        }
+                        `
+                    }} />
                 </ThemeProvider>
             </body>
         </html>

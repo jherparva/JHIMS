@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import styles from './pos.module.css'
-import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, CheckCircle2, FileText, Wallet, LogOut, Banknote, Landmark, Pencil, Loader2 } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, CheckCircle2, FileText, Wallet, LogOut, Banknote, Landmark, Pencil, Loader2, Wifi, WifiOff, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,7 @@ import { useDebounce } from "@/hooks/useDebounce"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
+import { jhimsOffline } from "@/lib/offline-db"
 
 interface Product {
     _id: string
@@ -54,6 +55,53 @@ export default function POSView() {
     const [selectingProduct, setSelectingProduct] = useState<Product | null>(null)
     const [isOpeningBoxOpen, setIsOpeningBoxOpen] = useState(false)
     const [openingAmount, setOpeningAmount] = useState("0")
+    
+    // OFFLINE & SYNC STATES
+    const [isOnline, setIsOnline] = useState(true)
+    const [isSyncing, setIsSyncing] = useState(false)
+    const [pendingSalesCount, setPendingSalesCount] = useState(0)
+
+    const syncOfflineSales = useCallback(async () => {
+        if (isSyncing || !navigator.onLine) return
+        
+        const pending = await jhimsOffline.getPendingSales()
+        if (pending.length === 0) {
+            setPendingSalesCount(0)
+            return
+        }
+
+        setIsSyncing(true)
+        setPendingSalesCount(pending.length)
+        
+        let successCount = 0
+        for (const sale of pending) {
+            try {
+                // Remove localId before sending to API
+                const { localId, offline, synced, ...saleData } = sale
+                const res = await fetch("/api/ventas", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(saleData)
+                })
+                
+                if (res.ok) {
+                    await jhimsOffline.removeSyncedSale(localId)
+                    successCount++
+                }
+            } catch (err) {
+                console.error("Error syncing offline sale:", err)
+            }
+        }
+        
+        if (successCount > 0) {
+            toast.success(`${successCount} ventas sincronizadas con éxito`)
+            fetchStats() // Actualizar totales
+        }
+        
+        const remaining = await jhimsOffline.getPendingSales()
+        setPendingSalesCount(remaining.length)
+        setIsSyncing(false)
+    }, [isSyncing])
 
     const fetchUser = async () => {
         try {
@@ -87,6 +135,22 @@ export default function POSView() {
         fetchStats()
         fetchUser()
         fetchActiveSession()
+
+        // Monitoreo de conexión
+        setIsOnline(navigator.onLine)
+        const handleOnline = () => { setIsOnline(true); syncOfflineSales(); }
+        const handleOffline = () => setIsOnline(false)
+        
+        window.addEventListener('online', handleOnline)
+        window.addEventListener('offline', handleOffline)
+        
+        // Cargar conteo inicial de pendientes
+        jhimsOffline.getPendingSales().then(p => setPendingSalesCount(p.length))
+        
+        return () => {
+            window.removeEventListener('online', handleOnline)
+            window.removeEventListener('offline', handleOffline)
+        }
     }, [])
 
     const fetchStats = async () => {
@@ -121,14 +185,29 @@ export default function POSView() {
     }
 
     const fetchProducts = async () => {
+        setLoading(true)
         try {
             const response = await fetch("/api/productos")
             if (response.ok) {
                 const data = await response.json()
-                setProducts(Array.isArray(data.products) ? data.products : [])
+                const list = Array.isArray(data.products) ? data.products : []
+                setProducts(list)
+                // CACHEAR LOCALMENTE
+                await jhimsOffline.cacheProducts(list)
+            } else {
+                // Si falla API (ej: offline), cargar de cache
+                const cached = await jhimsOffline.getCachedProducts()
+                if (cached.length > 0) {
+                    setProducts(cached)
+                    toast.info("Cargado desde caché local (Sin conexión)")
+                }
             }
         } catch (error) {
-            toast.error("Error al cargar productos")
+            const cached = await jhimsOffline.getCachedProducts()
+            if (cached.length > 0) {
+                setProducts(cached)
+                toast.info("Modo Offline: Usando inventario local")
+            }
         } finally {
             setLoading(false)
         }
@@ -219,16 +298,36 @@ export default function POSView() {
         }
 
         try {
+            const saleData = {
+                items: cart,
+                total: getTotal(),
+                paymentMethod: paymentMethod,
+                customer: selectedCustomer || null,
+                amountPaid: amountPaid ? Number(amountPaid) : getTotal(),
+            }
+
+            // --- LÓGICA OFFLINE ---
+            if (!navigator.onLine) {
+                await jhimsOffline.savePendingSale(saleData)
+                const pending = await jhimsOffline.getPendingSales()
+                setPendingSalesCount(pending.length)
+                
+                toast.info("Sin internet. Venta guardada localmente para sincronizar después.", {
+                    duration: 5000,
+                    icon: <WifiOff className="text-amber-500" />
+                })
+                
+                setCart([])
+                setSelectedCustomer("")
+                setAmountPaid("")
+                // No hay ID de venta real ni recibo oficial en offline puro, opcionalmente podrías imprimir uno genérico.
+                return
+            }
+
             const response = await fetch('/api/ventas', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    items: cart,
-                    total: getTotal(),
-                    paymentMethod: paymentMethod,
-                    customer: selectedCustomer || null,
-                    amountPaid: amountPaid ? Number(amountPaid) : getTotal()
-                })
+                body: JSON.stringify(saleData)
             })
 
             if (response.ok) {
@@ -356,6 +455,45 @@ export default function POSView() {
 
     return (
         <div className={styles.container}>
+            <header className={styles.header}>
+                <div className={styles.headerLeft}>
+                    <div className="flex flex-col">
+                        <h1 className="text-xl font-black tracking-tighter text-slate-800 flex items-center gap-2">
+                            JHIMS <span className="text-violet-600">POS</span>
+                            <div className={cn(
+                                "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] uppercase font-bold",
+                                isOnline ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                            )}>
+                                {isOnline ? <Wifi size={10} /> : <WifiOff size={10} />}
+                                {isOnline ? "Online" : "Offline"}
+                            </div>
+                        </h1>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{companyInfo?.name || "Cargando..."}</p>
+                    </div>
+
+                    {pendingSalesCount > 0 && (
+                        <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-xl animate-pulse">
+                            <RefreshCw className={cn("text-amber-500", isSyncing && "animate-spin")} size={14} />
+                            <span className="text-[10px] font-black text-amber-700 uppercase">
+                                {isSyncing ? "Sincronizando..." : `${pendingSalesCount} por subir`}
+                            </span>
+                        </div>
+                    )}
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    {/* Botón de cierre de caja rápido */}
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => setIsArqueoOpen(true)}
+                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 gap-2 font-bold text-[10px] uppercase"
+                    >
+                        <LogOut size={14} /> Cerrar Caja
+                    </Button>
+                </div>
+            </header>
+
             {/* Modal de Apertura de Caja */}
             <Dialog open={isOpeningBoxOpen} onOpenChange={(open) => {
                 if (activeSession) setIsOpeningBoxOpen(open)
