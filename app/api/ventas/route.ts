@@ -85,6 +85,7 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
                 paymentMethod: paymentMethod || "cash"
             }] : [],
             companyId: context.companyId,
+            seller: context.userId,
             ticketNumber,
             sequential: nextSequential
         })

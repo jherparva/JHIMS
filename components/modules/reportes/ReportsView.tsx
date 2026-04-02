@@ -191,76 +191,118 @@ export default function ReportsView() {
         const totalCompras = data.dailySummary.reduce((acc: number, curr: any) => acc + curr.compras, 0);
         const balance = totalVentas - totalCompras;
 
-        // 1. Preparar las filas con estructura de "Dashboard"
-        const rows = [
+        // --- HOJA 1: RESUMEN EJECUTIVO ---
+        const rowsSummary = [
             ["JHIMS - REPORTE GERENCIAL DE RENDIMIENTO"],
             [`EMPRESA: ${data.company?.name || "N/A"}`],
             [`NIT: ${data.company?.taxId || "N/A"}`],
             [`PERIODO: ${dateRange.from} AL ${dateRange.to}`],
-            [`FECHA DE GENERACIÓN: ${new Date().toLocaleString()}`],
+            [`FECHA GENERACIÓN: ${new Date().toLocaleString()}`],
             [],
-            ["--- RESUMEN FINANCIERO EJECUTIVO ---"],
+            ["--- RESUMEN FINANCIERO ---"],
             ["CONCEPTO", "VALOR ($)"],
             ["(+) TOTAL INGRESOS (VENTAS)", totalVentas],
             ["(-) TOTAL INVERSIONES (COMPRAS)", totalCompras],
-            ["(=) BALANCE OPERATIVO NETO", balance],
+            ["(=) BALANCE OPERATIVO", balance],
             [],
-            ["--- DESGLOSE DIARIO DETALLADO ---"],
-            ["FECHA", "DÍA", "INGRESOS ($)", "EGRESOS ($)", "DIFERENCIA ($)"]
+            ["--- RENDIMIENTO POR VENDEDOR ---"],
+            ["VENDEDOR", "Nº VENTAS", "TOTAL FACTURADO ($)"]
         ];
 
-        // 2. Insertar registros
+        (data.salesByVendor || []).forEach((v: any) => {
+            rowsSummary.push([v.name, v.count, v.total]);
+        });
+
+        rowsSummary.push([], ["--- TRÁFICO DIARIO ---"], ["FECHA", "DÍA", "INGRESOS ($)", "EGRESOS ($)", "DIFERENCIA ($)"]);
+
         data.dailySummary.forEach((d: any) => {
-            rows.push([
-                d.fullDate,
-                d.name.replace(".", "").toUpperCase(),
-                d.ventas,
-                d.compras,
-                d.ventas - d.compras
+            rowsSummary.push([d.fullDate, d.name.replace(".", "").toUpperCase(), d.ventas, d.compras, d.ventas - d.compras]);
+        });
+
+        // --- HOJA 2: DETALLE DE VENTAS (MÁXIMO DETALLE) ---
+        const rowsSales = [
+            ["LISTADO DETALLADO DE VENTAS - JHIMS"],
+            ["PERIODO:", `${dateRange.from} AL ${dateRange.to}`],
+            [],
+            ["TICKET #", "FECHA", "HORA", "VENDEDOR", "CLIENTE", "MÉTODO PAGO", "TOTAL ($)", "RECIBIDO ($)", "SALDO ($)"]
+        ];
+
+        (data.rawSales || []).forEach((s: any) => {
+            const date = new Date(s.createdAt);
+            rowsSales.push([
+                s.ticketNumber || s._id.slice(-6).toUpperCase(),
+                date.toLocaleDateString(),
+                date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                s.seller?.fullName || "N/A",
+                s.customer?.name || "CONSUMIDOR FINAL",
+                s.paymentMethod === 'cash' ? 'EFECTIVO' : (s.paymentMethod === 'transfer' ? 'TRANSFERENCIA / QR' : 'TARJETA'),
+                s.total,
+                s.amountPaid || 0,
+                (s.total - (s.amountPaid || 0))
             ]);
         });
 
-        // 3. Crear Hoja de Trabajo
-        const worksheet = XLSX.utils.aoa_to_sheet(rows);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte JHIMS");
+        // --- HOJA 3: DETALLE DE COMPRAS ---
+        const rowsPurchases = [
+            ["REGISTRO DE COMPRAS E INGRESOS A INVENTARIO"],
+            ["PERIODO:", `${dateRange.from} AL ${dateRange.to}`],
+            [],
+            ["ID / FACTURA", "FECHA", "PROVEEDOR", "PRODUCTOS", "TOTAL INVERTIDO ($)"]
+        ];
 
-        // 4. APLICAR FORMATOS DE MONEDA (Excel nativo)
-        const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:E1");
-        for (let R = range.s.r; R <= range.e.r; ++R) {
-            for (let C = range.s.c; C <= range.e.c; ++C) {
-                const cell_address = { c: C, r: R };
-                const cell_ref = XLSX.utils.encode_cell(cell_address);
-                const cell = worksheet[cell_ref];
-                
-                if (cell && typeof cell.v === 'number') {
-                    // Aplicar formato de contabilidad/moneda
-                    cell.t = 'n';
-                    cell.z = '$#,##0';
+        (data.rawPurchases || []).forEach((p: any) => {
+            rowsPurchases.push([
+                p.invoiceNumber || p._id.slice(-6).toUpperCase(),
+                new Date(p.createdAt).toLocaleDateString(),
+                p.supplier?.name || "N/A",
+                p.items?.length || 0,
+                p.total
+            ]);
+        });
+
+        // 3. Crear Libro y Hojas
+        const workbook = XLSX.utils.book_new();
+        
+        // Crear hojas de cálculo
+        const wsSummary = XLSX.utils.aoa_to_sheet(rowsSummary);
+        const wsSales = XLSX.utils.aoa_to_sheet(rowsSales);
+        const wsPurchases = XLSX.utils.aoa_to_sheet(rowsPurchases);
+
+        // 4. APLICAR FORMATOS Y AUTOMATIZACIONES A TODAS LAS HOJAS
+        [wsSummary, wsSales, wsPurchases].forEach(ws => {
+            // Aplicar formato de moneda a todas las celdas numéricas
+            const ref = ws['!ref'];
+            if (ref) {
+                const range = XLSX.utils.decode_range(ref);
+                for (let R = range.s.r; R <= range.e.r; ++R) {
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell = ws[XLSX.utils.encode_cell({ c: C, r: R })];
+                        if (cell && typeof cell.v === 'number') {
+                            cell.t = 'n';
+                            cell.z = '$#,##0';
+                        }
+                    }
                 }
             }
-        }
-
-        // 5. AUTO-AJUSTE DINÁMICO DE COLUMNAS (Auto-Fit)
-        const colWidths = rows[rows.length - 1].map((_, colIndex) => {
-            let maxLen = 12; // Mínimo
-            rows.forEach(row => {
-                const val = row[colIndex] ? row[colIndex].toString() : "";
-                if (val.length > maxLen) maxLen = val.length;
-            });
-            return { wch: maxLen + 2 };
         });
-        worksheet['!cols'] = colWidths;
 
-        // 6. ACTIVAR AUTO-FILTROS (Filtros nativos en los encabezados)
-        // La tabla de datos empieza en la fila 14 (índice 13)
-        worksheet['!autofilter'] = { ref: `A14:E${rows.length}` };
+        // Ajustar anchos (Auto-fit)
+        wsSummary['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+        wsSales['!cols'] = [{ wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 25 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
+        wsPurchases['!cols'] = [{ wch: 15 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 20 }];
 
-        // 7. Generar y descargar
-        const fileName = `REPORTE_JHIMS_${(data.company?.name || "VENTAS").replace(/\s/g, "_")}_${dateRange.from}_${dateRange.to}.xlsx`;
+        // Filtros (Hoja de ventas empieza tabla en fila 4 [index 3])
+        wsSales['!autofilter'] = { ref: `A4:I${rowsSales.length}` };
+
+        // 5. Ensamblar y Descargar
+        XLSX.utils.book_append_sheet(workbook, wsSummary, "Resumen General");
+        XLSX.utils.book_append_sheet(workbook, wsSales, "Ventas Detalladas");
+        XLSX.utils.book_append_sheet(workbook, wsPurchases, "Compras Detalladas");
+
+        const fileName = `JHIMS_REPORT_DETALLADO_${(data.company?.name || "VENTAS").replace(/\s/g, "_")}.xlsx`;
         XLSX.writeFile(workbook, fileName);
         
-        toast.success("Excel Inteligente generado: Columnas auto-ajustadas y filtros activos");
+        toast.success("Excel Multi-Pestaña Generado con éxito");
     }
 
     if (loading) {

@@ -27,6 +27,7 @@ export interface ISale extends Document {
     payments: IPayment[]
     date: Date
     companyId?: mongoose.Types.ObjectId
+    seller?: mongoose.Types.ObjectId
     ticketNumber?: string
     sequential?: number
 }
@@ -66,6 +67,7 @@ const SaleSchema = new Schema<ISale>(
         payments: [PaymentSchema],
         date: { type: Date, default: Date.now },
         companyId: { type: Schema.Types.ObjectId, ref: "Company" },
+        seller: { type: Schema.Types.ObjectId, ref: "User" },
         ticketNumber: { type: String, unique: false },
         sequential: { type: Number, default: 1 }
     },

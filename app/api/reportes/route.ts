@@ -168,13 +168,62 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
         ])
         console.log(`REPORTS: Productos top cargados: ${topProducts.length}`)
 
-        // 5. Datos de la Empresa para el Encabezado
+        // 5. Ventas por Vendedor (Ranking de Rendimiento)
+        const salesByVendor = await Sale.aggregate([
+            {
+                $match: {
+                    $or: [{ companyId: compId }, { companyId: context.companyId }],
+                    createdAt: { $gte: startDate, $lte: endDate }
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "seller",
+                    foreignField: "_id",
+                    as: "sellerInfo"
+                }
+            },
+            { $unwind: "$sellerInfo" },
+            {
+                $group: {
+                    _id: "$sellerInfo.fullName",
+                    total: { $sum: "$total" },
+                    count: { $sum: 1 }
+                }
+            },
+            { $project: { name: "$_id", total: 1, count: 1, _id: 0 } },
+            { $sort: { total: -1 } }
+        ])
+
+        // 6. Transacciones Individuales (El Detalle Máximo)
+        const rawSales = await Sale.find({
+            $or: [{ companyId: compId }, { companyId: context.companyId }],
+            createdAt: { $gte: startDate, $lte: endDate }
+        })
+        .populate('customer', 'name taxId')
+        .populate('seller', 'fullName')
+        .sort({ createdAt: -1 })
+        .lean()
+
+        const rawPurchases = await StockIn.find({
+            $or: [{ companyId: compId }, { companyId: context.companyId }],
+            createdAt: { $gte: startDate, $lte: endDate }
+        })
+        .populate('supplier', 'name')
+        .sort({ createdAt: -1 })
+        .lean()
+
+        // 6. Datos de la Empresa para el Encabezado
         const company = await mongoose.model("Company").findById(compId).select("name taxId").lean();
 
         const responseData = {
             salesByCategory: salesByCategory.length > 0 ? salesByCategory : [{ name: 'Sin Ventas', value: 1 }],
             dailySummary,
             topProducts,
+            salesByVendor: salesByVendor || [],
+            rawSales: rawSales || [],
+            rawPurchases: rawPurchases || [],
             company: company || { name: "JHIMS Usuario", taxId: "N/A" }
         }
 
