@@ -113,6 +113,8 @@ export interface ICompany extends Document {
     digitalSignature?: string
     taxId?: string
     address?: string
+    paymentQR?: string
+    paymentInfo?: string
 
     // Soporte
     supportPriority: 'standard' | 'priority' | 'vip'
@@ -182,6 +184,8 @@ const CompanySchema = new Schema<ICompany>({
     digitalSignature: { type: String },
     taxId: { type: String },
     address: { type: String },
+    paymentQR: { type: String }, // Nueva: URL de imagen de QR (Nequi/Daviplata/etc)
+    paymentInfo: { type: String }, // Nueva: Texto libre con instrucciones de pago
 
     supportPriority: {
         type: String,

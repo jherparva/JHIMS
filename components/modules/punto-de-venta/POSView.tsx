@@ -355,6 +355,31 @@ export default function POSView() {
                             <option value="transfer">Transferencia</option>
                         </select>
                         <input type="number" className="w-full border rounded-md p-2 text-sm" placeholder="Monto Abona" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
+                        
+                        {/* Nueva sección de Pago QR/Transferencia */}
+                        {paymentMethod === 'transfer' && (
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-2 animate-in fade-in zoom-in duration-300">
+                                <p className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-1">
+                                    <Banknote size={12} /> Pagar por Transferencia
+                                </p>
+                                {companyInfo?.paymentQR ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <img 
+                                            src={companyInfo.paymentQR} 
+                                            alt="QR de Pago" 
+                                            className="w-32 h-32 object-contain bg-white p-1 rounded-lg border shadow-sm"
+                                        />
+                                        <p className="text-[10px] text-center font-bold text-slate-600 leading-tight">
+                                            {companyInfo.paymentInfo || 'Escanea para pagar'}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="text-[10px] text-blue-700 italic text-center p-2">
+                                        {companyInfo?.paymentInfo || "No hay información de pago configurada en 'Configuración > Empresa'"}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className={styles.totalRow}>
                         <span className={styles.totalLabel}>Total:</span>

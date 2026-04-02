@@ -70,7 +70,7 @@ export const PUT = withSessionContext(async (req: NextRequest, context: any) => 
     try {
         await connectDB()
         const body = await req.json()
-        const { name, taxId, address, phone } = body
+        const { name, taxId, address, phone, paymentQR, paymentInfo } = body
 
         // 1. Obtener el companyId real desde el usuario en la DB (por si la sesión está mal)
         // PERO SOLO para usuarios que NO sean superadmin
@@ -86,7 +86,7 @@ export const PUT = withSessionContext(async (req: NextRequest, context: any) => 
 
         const company = await Company.findByIdAndUpdate(
             userInDb.companyId,
-            { name, taxId, address, phone },
+            { name, taxId, address, phone, paymentQR, paymentInfo },
             { new: true, runValidators: true }
         ).setOptions({ skipTenantFilter: true });
 

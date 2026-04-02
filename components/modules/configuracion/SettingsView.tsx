@@ -216,6 +216,34 @@ export default function SettingsView() {
                                     />
                                     <p className="text-[10px] text-muted-foreground italic">Este texto aparecerá al final de todos tus recibos impresos.</p>
                                 </div>
+                                <Separator className="col-span-full my-4" />
+                                <div className="col-span-full space-y-4">
+                                    <div className="flex flex-col">
+                                        <Label className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-2 mb-2">
+                                            <ShieldCheck size={18} /> Métodos de Pago Alternativos (Costo $0)
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground mb-4">Configura aquí los datos para que tus clientes te paguen por transferencia (Nequi, Daviplata, Bancolombia) sin pagar comisiones a pasarelas.</p>
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Instrucciones de Pago (Texto)</Label>
+                                            <Input
+                                                value={company?.paymentInfo || ""}
+                                                onChange={(e) => setCompany({ ...company, paymentInfo: e.target.value })}
+                                                placeholder="Ej: Nequi: 300 123 4567 - Bancolombia: Ahorros 123..."
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>URL Imagen Código QR</Label>
+                                            <Input
+                                                value={company?.paymentQR || ""}
+                                                onChange={(e) => setCompany({ ...company, paymentQR: e.target.value })}
+                                                placeholder="Pega aquí el link de tu imagen de QR"
+                                            />
+                                            <p className="text-[10px] text-muted-foreground">Sube tu QR a un servicio de imágenes y pega el enlace aquí para mostrarlo en el POS.</p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <Button onClick={handleUpdateCompany} disabled={saving}>
                                 {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
