@@ -44,14 +44,26 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        // Verificar si el usuario ya existe
+        // Verificar si el usuario ya existe (Búsqueda GLOBAL)
         const existingUser = await User.findOne({
             $or: [{ username }, { email }]
-        })
+        }).lean()
 
         if (existingUser) {
             return NextResponse.json(
-                { error: "El usuario o email ya existe" },
+                { 
+                    error: `El usuario '${username}' o email '${email}' ya está registrado en el sistema.`,
+                    details: "Si el negocio anterior fue eliminado, asegúrese de haber borrado también al administrador."
+                },
+                { status: 400 }
+            )
+        }
+
+        // Verificar si el email ya lo tiene otra empresa (por si acaso)
+        const emailInCompany = await Company.findOne({ email }).lean() as any
+        if (emailInCompany && emailInCompany._id.toString() !== companyId) {
+             return NextResponse.json(
+                { error: `El correo '${email}' ya pertenece a otra empresa activa.` },
                 { status: 400 }
             )
         }
@@ -87,8 +99,12 @@ export async function POST(req: NextRequest) {
 
         // Verificación final: asegurar que el usuario fue creado correctamente
         const verification = await User.findById(admin._id).select('username email role companyId isActive');
-        if (!verification || !verification.isActive) {
-            throw new Error('Error al verificar la creación del administrador');
+        if (!verification) {
+            throw new Error('El administrador fue creado pero no se pudo verificar en la base de datos inmediatamente.');
+        }
+        
+        if (!verification.isActive) {
+            throw new Error('El administrador fue creado pero se encuentra inactivo.');
         }
 
         console.log('✅ Admin creado y verificado:', {
@@ -116,7 +132,7 @@ export async function POST(req: NextRequest) {
         delete adminResponse.password
 
         const responseMessage = existingAdmin 
-            ? `Administrador reemplazado exitosamente. Anterior admin desactivado.`
+            ? `Administrador reemplazado exitosamente. Anterior admin eliminado.`
             : `Administrador creado exitosamente`
 
         return NextResponse.json({
@@ -134,9 +150,14 @@ export async function POST(req: NextRequest) {
         }, { status: 201 })
 
     } catch (error: any) {
-        console.error("SUPERADMIN CREATE ADMIN ERROR:", error)
+        console.error("FATAL: SUPERADMIN CREATE ADMIN ERROR:", {
+            message: error.message,
+            stack: error.stack,
+            name: error.name,
+            errors: error.errors
+        })
         return NextResponse.json(
-            { error: "Error al crear administrador" },
+            { error: "Error al crear administrador: " + (error.message || "Error desconocido") },
             { status: 500 }
         )
     }

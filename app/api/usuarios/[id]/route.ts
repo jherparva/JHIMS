@@ -110,7 +110,7 @@ export const DELETE = withSessionContext(async (
     try {
         await connectDB()
 
-        const user = await User.findByIdAndUpdate(params.id, { isActive: false }, { new: true })
+        const user = await User.findByIdAndDelete(params.id)
 
         if (!user) {
             return NextResponse.json(

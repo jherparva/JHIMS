@@ -347,51 +347,97 @@ export default function POSView() {
             </div>
 
             <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
-                <DialogContent className="max-w-2xl bg-white">
-                    <DialogHeader>
-                        <DialogTitle className="flex justify-between items-start border-b pb-6">
+                <DialogContent className="max-w-2xl bg-white p-0 overflow-hidden border-none shadow-2xl print:shadow-none print:max-w-none print:w-full print:static print:transform-none">
+                    <DialogHeader className="p-6 bg-slate-900 text-white print:bg-white print:text-black print:pb-2 print:pt-4">
+                        <DialogTitle className="flex justify-between items-start">
                             <div className="flex flex-col text-left">
-                                <span className={cn("text-emerald-600 font-bold flex items-center gap-2 print:hidden")}>
+                                <span className="text-emerald-400 font-bold flex items-center gap-2 print:hidden text-sm mb-2">
                                     <CheckCircle2 className="h-5 w-5" /> ¡Venta Exitosa!
                                 </span>
-                                <span className="hidden print:block text-4xl font-black">{companyInfo?.name}</span>
+                                <h2 className="text-2xl font-black tracking-tighter uppercase leading-none print:text-3xl">
+                                    {companyInfo?.name || 'MI NEGOCIO'}
+                                </h2>
+                                <div className="mt-1 text-slate-400 print:text-black text-[10px] font-bold space-y-0.5">
+                                    <p>NIT: {companyInfo?.taxId || '---'}</p>
+                                    <p>{companyInfo?.address || 'Dirección no registrada'}</p>
+                                    <p>TEL: {companyInfo?.phone || '---'}</p>
+                                </div>
                             </div>
-                            <span className="text-sm font-mono font-bold">{lastSale?.ticketNumber || 'TICKET'}</span>
+                            <div className="text-right">
+                                <span className="bg-white/10 px-3 py-1 rounded-full text-[10px] font-black uppercase print:bg-black print:text-white">
+                                    {isThermalPrint ? 'Ticket de Venta' : 'Factura de Venta'}
+                                </span>
+                                <p className="mt-2 font-mono text-sm font-bold">{lastSale?.ticketNumber}</p>
+                            </div>
                         </DialogTitle>
                     </DialogHeader>
+
                     {lastSale && (
-                        <div className="py-4 flex flex-col h-full">
-                            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-                                <div className="bg-gray-50 p-3 rounded-lg border">
+                        <div className="p-6 pt-2 flex flex-col h-full print:p-4">
+                            <div className="grid grid-cols-2 gap-4 mb-6 text-sm print:mb-4">
+                                <div className="bg-slate-50 p-4 rounded-2xl border print:p-2 print:rounded-none print:border-x-0 print:border-t-0">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Detalles</p>
                                     <p><strong>Fecha:</strong> {lastSale.date}</p>
                                     <p><strong>Método:</strong> {lastSale.paymentMethod}</p>
                                 </div>
-                                <div className="bg-primary/5 p-3 rounded-lg border text-right">
-                                    <p className="text-2xl font-black">${lastSale.total.toLocaleString()}</p>
+                                <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 text-right print:p-2 print:rounded-none print:bg-white print:border-x-0 print:border-t-0">
+                                    <p className="text-[10px] font-black text-emerald-600 uppercase mb-1">Total a Pagar</p>
+                                    <p className="text-3xl font-black text-emerald-700 print:text-black">${lastSale.total.toLocaleString()}</p>
                                 </div>
                             </div>
-                            <table className="w-full text-sm border-t">
-                                <thead>
-                                    <tr className="border-b bg-gray-50">
-                                        <th className="p-2 text-left">Ref</th>
-                                        <th className="p-2 text-center">Cant</th>
-                                        <th className="p-2 text-right">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {lastSale.items.map((item, i) => (
-                                        <tr key={i} className="border-b">
-                                            <td className="p-2">{item.product.name}</td>
-                                            <td className="p-2 text-center">{item.quantity}</td>
-                                            <td className="p-2 text-right">${(item.product.salePrice * item.quantity).toLocaleString()}</td>
+
+                            <div className="border rounded-2xl overflow-hidden print:border-x-0 print:rounded-none">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b print:bg-white">
+                                        <tr>
+                                            <th className="p-3 text-left font-black uppercase text-[10px]">Descripción</th>
+                                            <th className="p-3 text-center font-black uppercase text-[10px]">Cant</th>
+                                            <th className="p-3 text-right font-black uppercase text-[10px]">Subtotal</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {lastSale.items.map((item, i) => (
+                                            <tr key={i} className="hover:bg-slate-50/50">
+                                                <td className="p-3 font-medium">{item.product.name}</td>
+                                                <td className="p-3 text-center">{item.quantity}</td>
+                                                <td className="p-3 text-right font-bold">${(item.product.salePrice * item.quantity).toLocaleString()}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
                             <div className="mt-8 flex gap-3 print:hidden">
-                                <Button variant="outline" className="flex-1 h-12" onClick={() => setIsReceiptOpen(false)}>Cerrar</Button>
-                                <Button className="flex-1 h-12 bg-gray-800" onClick={() => handlePrint(true)}><Printer className="mr-2" /> Ticket</Button>
-                                <Button className="flex-1 h-12" onClick={() => handlePrint(false)}><FileText className="mr-2" /> Factura</Button>
+                                <Button 
+                                    variant="outline" 
+                                    className="flex-1 h-14 rounded-2xl font-bold border-2" 
+                                    onClick={() => setIsReceiptOpen(false)}
+                                >
+                                    Cerrar
+                                </Button>
+                                <Button 
+                                    className="flex-1 h-14 rounded-2xl font-black bg-slate-900 text-white hover:bg-slate-800 shadow-xl gap-2" 
+                                    onClick={() => handlePrint(true)}
+                                >
+                                    <Printer size={20} />
+                                    Ticket (80mm)
+                                </Button>
+                                <Button 
+                                    className="flex-1 h-14 rounded-2xl font-black bg-blue-600 text-white hover:bg-blue-500 shadow-xl gap-2" 
+                                    onClick={() => handlePrint(false)}
+                                >
+                                    <FileText size={20} />
+                                    Factura (A4)
+                                </Button>
+                            </div>
+
+                            {/* Footer para Impresión */}
+                            <div className="hidden print:block mt-8 text-center pt-6 border-t border-dashed">
+                                <p className="text-sm font-black uppercase tracking-widest">¡Gracias por su compra!</p>
+                                <p className="text-[9px] text-slate-500 mt-1">JHIMS - Sistema de Gestión Inteligente</p>
+                                <div className="mt-4 flex justify-center opacity-20">
+                                    <div className="h-0.5 w-16 bg-black" />
+                                </div>
                             </div>
                         </div>
                     )}
@@ -462,15 +508,51 @@ export default function POSView() {
 
             <style jsx global>{`
                 @media print {
-                    @page { margin: 0; size: ${isThermalPrint ? '80mm auto' : 'auto'}; }
-                    header, footer, nav, aside, .print\\:hidden, main > div:not([data-radix-portal]) { display: none !important; }
-                    [data-radix-portal] { display: block !important; position: static !important; }
-                    [role="dialog"] { 
-                        display: flex !important; flex-direction: column !important; position: static !important;
-                        width: ${isThermalPrint ? '80mm' : '100%'} !important; border: none !important; box-shadow: none !important;
-                        padding: ${isThermalPrint ? '5mm' : '1cm'} !important; visibility: visible !important;
+                    @page { 
+                        margin: ${isThermalPrint ? '0' : '10mm'}; 
+                        size: ${isThermalPrint ? '80mm auto' : 'auto'}; 
                     }
-                    ${isThermalPrint ? `* { font-family: 'Courier New', monospace !important; font-size: 10px !important; }` : ''}
+                    
+                    /* Limpieza profunda de UI para impresión */
+                    header, footer, nav, aside, 
+                    .print\\:hidden, 
+                    [class*="DialogOverlay"],
+                    button[aria-label="Close"],
+                    .lucide,
+                    main > div:not([data-radix-portal]),
+                    section:not([data-radix-portal]) { 
+                        display: none !important; 
+                    }
+
+                    [data-radix-portal] { 
+                        display: block !important; 
+                        position: static !important; 
+                    }
+
+                    [role="dialog"] { 
+                        display: flex !important; 
+                        flex-direction: column !important; 
+                        position: absolute !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: ${isThermalPrint ? '80mm' : '100%'} !important; 
+                        border: none !important; 
+                        box-shadow: none !important;
+                        padding: ${isThermalPrint ? '2mm' : '0'} !important; 
+                        background: white !important;
+                        visibility: visible !important;
+                    }
+
+                    ${isThermalPrint ? `
+                        * { font-family: 'Courier New', monospace !important; font-size: 11px !important; color: black !important; }
+                        h2 { font-size: 16px !important; text-align: center !important; }
+                        .text-3xl { font-size: 18px !important; }
+                        table { width: 100% !important; border-top: 1px dashed black !important; margin-top: 5px !important; }
+                        th { border-bottom: 1px dashed black !important; }
+                        .bg-slate-900, .bg-slate-50, .bg-emerald-50 { background: white !important; color: black !important; border: none !important; }
+                    ` : `
+                        * { color: black !important; }
+                    `}
                 }
             `}</style>
         </div>

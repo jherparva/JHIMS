@@ -136,7 +136,7 @@ export interface ICompany extends Document {
 const CompanySchema = new Schema<ICompany>({
     slug: { type: String, required: true, unique: true, trim: true, lowercase: true },
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, lowercase: true },
+    email: { type: String, required: true, lowercase: true, unique: true },
     phone: { type: String, required: false, trim: true },
     businessType: { 
         type: String, 
