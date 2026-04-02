@@ -4,9 +4,10 @@
  */
 
 const DB_NAME = 'JHIMS_OFFLINE_DB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORE_SALES = 'pending_sales';
 const STORE_PRODUCTS = 'cached_products';
+const STORE_SESSION = 'auth_session';
 
 export class OfflineDB {
     private db: IDBDatabase | null = null;
@@ -22,6 +23,9 @@ export class OfflineDB {
                 }
                 if (!db.objectStoreNames.contains(STORE_PRODUCTS)) {
                     db.createObjectStore(STORE_PRODUCTS, { keyPath: '_id' });
+                }
+                if (!db.objectStoreNames.contains(STORE_SESSION)) {
+                    db.createObjectStore(STORE_SESSION, { keyPath: 'id' });
                 }
             };
 
@@ -76,6 +80,28 @@ export class OfflineDB {
         const db = await this.open();
         const tx = db.transaction(STORE_SALES, 'readwrite');
         tx.objectStore(STORE_SALES).delete(localId);
+    }
+
+    // --- SESIÓN ---
+    async setSession(userData: any) {
+        const db = await this.open();
+        const tx = db.transaction(STORE_SESSION, 'readwrite');
+        tx.objectStore(STORE_SESSION).put({ id: 'current', ...userData });
+    }
+
+    async getSession(): Promise<any | null> {
+        const db = await this.open();
+        return new Promise((resolve) => {
+            const tx = db.transaction(STORE_SESSION, 'readonly');
+            const request = tx.objectStore(STORE_SESSION).get('current');
+            request.onsuccess = () => resolve(request.result);
+        });
+    }
+
+    async clearSession() {
+        const db = await this.open();
+        const tx = db.transaction(STORE_SESSION, 'readwrite');
+        tx.objectStore(STORE_SESSION).delete('current');
     }
 }
 

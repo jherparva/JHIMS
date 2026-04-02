@@ -10,11 +10,14 @@ const inter = Inter({ subsets: ["latin"] });
 // METADATOS
 // =============================================================================
 export const metadata: Metadata = {
-    title: "JHIMS POS Profesional",
-    description: "Sistema de Punto de Venta con Soporte Offline",
+    title: "JHIMS Inventory",
+    description: "JHIMS Inventory Management System",
     manifest: "/manifest.json",
     icons: {
-        icon: '/icon1.png',
+        icon: [
+            { url: '/icon1.png', sizes: '32x32' },
+            { url: '/icon1.png', sizes: '192x192' },
+        ],
         shortcut: '/icon1.png',
         apple: '/icon1.png',
     }

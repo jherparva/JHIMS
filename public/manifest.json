@@ -1,12 +1,12 @@
 {
-  "name": "JHIMS - Punto de Venta Profesional",
-  "short_name": "JHIMS POS",
-  "description": "Sistema de gestión POS con soporte offline y facturación profesional",
+  "name": "JHIMS Inventory Management",
+  "short_name": "JHIMS",
+  "description": "Sistema de gestión de inventario y ventas JHIMS",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#7c3aed",
-  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#020617",
+  "orientation": "any",
   "scope": "/",
   "categories": ["business", "productivity", "utilities"],
   "icons": [
@@ -23,8 +23,8 @@
       "purpose": "maskable"
     },
     {
-      "src": "/icon1.png",
-      "sizes": "1024x1024",
+      "src": "/icon.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

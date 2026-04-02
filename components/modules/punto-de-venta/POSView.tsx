@@ -109,8 +109,17 @@ export default function POSView() {
             if (response.ok) {
                 const data = await response.json()
                 setCurrentUser(data.user)
+                // GUARDAR SESIÓN PARA USO OFFLINE
+                await jhimsOffline.setSession(data.user)
+            } else {
+                // Si falla API, intentar cargar de sesión local
+                const cached = await jhimsOffline.getSession()
+                if (cached) setCurrentUser(cached)
             }
-        } catch (e) {}
+        } catch (e) {
+            const cached = await jhimsOffline.getSession()
+            if (cached) setCurrentUser(cached)
+        }
     }
 
     const fetchActiveSession = async () => {

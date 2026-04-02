@@ -51,8 +51,8 @@ export function PWAInstall() {
                         <Monitor className="text-white" size={24} />
                     </div>
                     <div className="flex-1">
-                        <h4 className="text-white font-bold text-sm">Instalar Aplicación</h4>
-                        <p className="text-slate-400 text-xs">Acceso directo en tu escritorio</p>
+                        <h4 className="text-white font-bold text-sm tracking-tight italic">JHIMS INVENTORY</h4>
+                        <p className="text-slate-400 text-[10px] uppercase font-black">Sistema de Gestión Profesional</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button 
