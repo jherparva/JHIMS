@@ -559,11 +559,19 @@ export default function POSView() {
                 </div>
             </header>
 
-            {/* Modal de Apertura de Caja */}
-            <Dialog open={isOpeningBoxOpen} onOpenChange={(open) => {
-                if (activeSession) setIsOpeningBoxOpen(open)
-            }}>
-                <DialogContent className="max-w-sm bg-white rounded-3xl p-8 shadow-2xl border-none">
+            {/* Modal de Apertura de Caja - Bloqueado hasta abrir sesión */}
+            <Dialog 
+                open={isOpeningBoxOpen} 
+                onOpenChange={(open) => {
+                    // Solo permite cerrar el modal si ya existe una sesión activa
+                    if (activeSession) setIsOpeningBoxOpen(open)
+                }}
+            >
+                <DialogContent 
+                    className="max-w-sm bg-white rounded-3xl p-8 shadow-2xl border-none [&>button]:hidden"
+                    onInteractOutside={(e) => e.preventDefault()}
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                >
                     <div className="text-center space-y-6">
                         <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
                             <Banknote size={40} />
