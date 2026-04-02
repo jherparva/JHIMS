@@ -209,7 +209,7 @@ export default function ReportsView() {
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head>
                 <meta charset="utf-8">
-                \${styles}
+                ${styles}
             </head>
             <body>
                 <table>
@@ -217,15 +217,15 @@ export default function ReportsView() {
                     <tr><td colspan="5" class="subtitle">REPORTE DE RENDIMIENTO OPERATIVO</td></tr>
                     <tr><td></td></tr>
                     <tr><td colspan="5" class="label">INFORMACIÓN DE LA EMPRESA</td></tr>
-                    <tr><td class="label">Empresa:</td><td colspan="4">\${data.company?.name || 'N/A'}</td></tr>
-                    <tr><td class="label">NIT:</td><td colspan="4">\${data.company?.taxId || 'N/A'}</td></tr>
-                    <tr><td class="label">Periodo:</td><td colspan="4">\${dateRange.from} al \${dateRange.to}</td></tr>
-                    <tr><td class="label">Fecha Generación:</td><td colspan="4">\${new Date().toLocaleString()}</td></tr>
+                    <tr><td class="label">Empresa:</td><td colspan="4">${data.company?.name || 'N/A'}</td></tr>
+                    <tr><td class="label">NIT:</td><td colspan="4">${data.company?.taxId || 'N/A'}</td></tr>
+                    <tr><td class="label">Periodo:</td><td colspan="4">${dateRange.from} al ${dateRange.to}</td></tr>
+                    <tr><td class="label">Fecha Generación:</td><td colspan="4">${new Date().toLocaleString()}</td></tr>
                     <tr><td></td></tr>
                     <tr><td colspan="5" class="label">RESUMEN FINANCIERO DEL PERIODO</td></tr>
-                    <tr><td colspan="2" class="total-ingresos">(+) TOTAL INGRESOS POR VENTAS:</td><td colspan="3" class="total-ingresos number">\${Math.round(totalVentas)}</td></tr>
-                    <tr><td colspan="2" class="total-inversion">(-) TOTAL INVERSIÓN EN COMPRAS:</td><td colspan="3" class="total-inversion number">\${Math.round(totalCompras)}</td></tr>
-                    <tr><td colspan="2" class="total-balance">(=) BALANCE OPERATIVO:</td><td colspan="3" class="total-balance number">\${Math.round(balance)}</td></tr>
+                    <tr><td colspan="2" class="total-ingresos">(+) TOTAL INGRESOS POR VENTAS:</td><td colspan="3" class="total-ingresos number">${Math.round(totalVentas)}</td></tr>
+                    <tr><td colspan="2" class="total-inversion">(-) TOTAL INVERSIÓN EN COMPRAS:</td><td colspan="3" class="total-inversion number">${Math.round(totalCompras)}</td></tr>
+                    <tr><td colspan="2" class="total-balance">(=) BALANCE OPERATIVO:</td><td colspan="3" class="total-balance number">${Math.round(balance)}</td></tr>
                     <tr><td></td></tr>
                     <tr><td colspan="5" class="label">DESGLOSE DIARIO DETALLADO</td></tr>
                     <tr class="table-header">
@@ -235,15 +235,15 @@ export default function ReportsView() {
                         <th>Compras ($)</th>
                         <th>Balance ($)</th>
                     </tr>
-                    \${data.dailySummary.map((d: any, i: number) => \`
-                        <tr class="\${i % 2 === 0 ? 'row-even' : ''}">
-                            <td>\${d.fullDate}</td>
-                            <td>\${d.name.replace(".", "")}</td>
-                            <td class="number">\${Math.round(d.ventas)}</td>
-                            <td class="number">\${Math.round(d.compras)}</td>
-                            <td class="number">\${Math.round(d.ventas - d.compras)}</td>
+                    ${data.dailySummary.map((d: any, i: number) => `
+                        <tr class="${i % 2 === 0 ? 'row-even' : ''}">
+                            <td>${d.fullDate}</td>
+                            <td>${d.name.replace(".", "")}</td>
+                            <td class="number">${Math.round(d.ventas)}</td>
+                            <td class="number">${Math.round(d.compras)}</td>
+                            <td class="number">${Math.round(d.ventas - d.compras)}</td>
                         </tr>
-                    \`).join('')}
+                    `).join('')}
                 </table>
             </body>
             </html>
@@ -253,7 +253,7 @@ export default function ReportsView() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Reporte_JHIMS_\${data.company?.name || 'Ventas'}.xls`);
+        link.setAttribute("download", `Reporte_JHIMS_${data.company?.name || 'Ventas'}.xls`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
