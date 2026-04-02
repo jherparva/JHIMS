@@ -289,11 +289,13 @@ function ActionModal({
 
 // ─── Modal para crear administrador ─────────────────────────────────────
 function CreateAdminModal({
-    companies, onClose, onCreateAdmin
+    companies, onClose, onCreateAdmin, setShowCreateAdminModal, fetchData
 }: {
     companies: CompanyData[]
     onClose: () => void
     onCreateAdmin: (data: any) => void
+    setShowCreateAdminModal: (show: boolean) => void
+    fetchData: () => void
 }) {
     const [formData, setFormData] = useState({
         fullName: "",
@@ -313,10 +315,19 @@ function CreateAdminModal({
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         
-        // Validaciones
-        if (!formData.fullName || !formData.username || !formData.email || !formData.password) {
-            toast.error("Todos los campos son requeridos")
-            return
+        // 1. Validaciones de Campos Obligatorios
+        const requiredFields = {
+            fullName: "Nombre completo",
+            username: "Nombre de usuario",
+            email: "Correo electrónico del admin",
+            password: "Contraseña"
+        }
+
+        for (const [key, label] of Object.entries(requiredFields)) {
+            if (!formData[key as keyof typeof formData]) {
+                toast.error(`El campo '${label}' es obligatorio`);
+                return;
+            }
         }
         
         if (formData.password !== formData.confirmPassword) {
@@ -324,20 +335,23 @@ function CreateAdminModal({
             return
         }
         
-        if (formData.password.length < 6) {
-            toast.error("La contraseña debe tener al menos 6 caracteres")
+        // 2. Validación de Contraseña Compleja
+        // Mínimo 8 caracteres, una mayúscula, una minúscula, un número y un signo
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&._\-\/\\#+,:;{}()[\]^~`|<>="'\\!])[A-Za-z\d@$!%*?&._\-\/\\#+,:;{}()[\]^~`|<>="'\\!]{8,}$/;
+        if (!passwordRegex.test(formData.password)) {
+            toast.error("Contraseña débil: Mínimo 8 caracteres, incluyendo mayúsculas, minúsculas, números y un signo especial (@$!%*?&...)");
             return
         }
         
-        // Validaciones específicas según el modo
+        // 3. Validaciones específicas según el modo
         if (formData.createNewCompany) {
             if (!formData.newCompanyName || !formData.newCompanyEmail) {
-                toast.error("Nombre y email de la empresa son requeridos")
+                toast.error("Nombre y email de la empresa son obligatorios")
                 return
             }
         } else {
             if (!formData.companyId) {
-                toast.error("Debe seleccionar una empresa")
+                toast.error("Debe seleccionar una empresa existente")
                 return
             }
         }
@@ -345,7 +359,7 @@ function CreateAdminModal({
         setIsLoading(true)
         
         if (formData.createNewCompany) {
-            // Primero crear la empresa
+            // Primero crear la empresa (Con lógica de reversión)
             await createCompanyAndAdmin()
         } else {
             // Solo crear admin para empresa existente
@@ -362,6 +376,7 @@ function CreateAdminModal({
     }
 
     const createCompanyAndAdmin = async () => {
+        let createdCompanyId = null;
         try {
             setIsCreatingCompany(true)
             
@@ -378,25 +393,50 @@ function CreateAdminModal({
                 })
             })
             
+            const companyData = await companyRes.json()
+
             if (!companyRes.ok) {
-                const error = await companyRes.json()
-                toast.error(error.error || "Error al crear empresa")
+                toast.error(companyData.error || "Error al crear empresa")
                 return
             }
             
-            const newCompany = await companyRes.json()
+            createdCompanyId = companyData._id;
             
-            // 2. Crear el administrador para la nueva empresa
-            await onCreateAdmin({
-                fullName: formData.fullName,
-                username: formData.username,
-                email: formData.email,
-                password: formData.password,
-                companyId: newCompany._id
+            // 2. Intentar crear el administrador
+            // Usamos una versión local de onCreateAdmin para manejar el error y hacer ROLLBACK
+            const adminRes = await fetch("/api/super-administrador/administradores", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    fullName: formData.fullName,
+                    username: formData.username,
+                    email: formData.email,
+                    password: formData.password,
+                    companyId: createdCompanyId
+                })
             })
+
+            const adminData = await adminRes.json()
+
+            if (adminRes.ok) {
+                toast.success("✅ Empresa y Administrador creados con éxito")
+                setShowCreateAdminModal(false)
+                fetchData()
+            } else {
+                // ❌ FALLÓ EL ADMIN: HACER ROLLBACK DE LA EMPRESA
+                console.error("Fallo creación admin, revirtiendo empresa:", createdCompanyId);
+                await fetch(`/api/super-administrador/empresas/${createdCompanyId}`, {
+                    method: "DELETE"
+                });
+                toast.error(`No se pudo crear el admin: ${adminData.error}. Se ha revertido la creación de la empresa.`);
+            }
             
         } catch (error) {
-            toast.error("Error de conexión")
+            console.error("Error fatal en creación atómica:", error);
+            if (createdCompanyId) {
+                await fetch(`/api/super-administrador/empresas/${createdCompanyId}`, { method: "DELETE" });
+            }
+            toast.error("Error de conexión. Se canceló la creación del negocio.");
         } finally {
             setIsCreatingCompany(false)
         }
@@ -1560,6 +1600,8 @@ export default function SuperAdminPanel() {
                         setSelectedCompanyForAdmin(null)
                     }}
                     onCreateAdmin={createAdmin}
+                    setShowCreateAdminModal={setShowCreateAdminModal}
+                    fetchData={fetchData}
                 />
             )}
 

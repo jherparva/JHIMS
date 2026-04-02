@@ -255,10 +255,28 @@ export default function POSView() {
                     <Search size={20} className="text-gray-400" />
                     <input
                         type="text"
-                        placeholder="Buscar productos..."
+                        placeholder="Buscar productos o escanear código..."
                         className="flex-1 outline-none"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && searchTerm.trim() !== '') {
+                                // Buscar coincidencia exacta por SKU (Código de barras)
+                                const exactMatch = products.find(p => 
+                                    p.sku.toLowerCase() === searchTerm.trim().toLowerCase()
+                                );
+                                
+                                if (exactMatch) {
+                                    if (exactMatch.stock <= 0) {
+                                        toast.error(`Sin stock para: ${exactMatch.name}`);
+                                    } else {
+                                        addToCart(exactMatch);
+                                        toast.success(`Añadido: ${exactMatch.name}`);
+                                        setSearchTerm(""); // Limpiar para siguiente escaneo
+                                    }
+                                }
+                            }
+                        }}
                     />
                 </div>
 
