@@ -18,7 +18,7 @@ interface UserData {
 // Permisos que se pueden asignar individualmente a un Vendedor
 const SELLER_PERMISSIONS = [
     { id: 'products.view', label: 'Ver Inventario' },
-    { id: 'sales.create', label: 'Realizar Ventas (POS)' },
+    { id: 'sales.create', label: 'Realizar Ventas (Caja)' },
     { id: 'sales.view', label: 'Ver Historial de Ventas' },
     { id: 'customers.create', label: 'Registrar Clientes' },
     { id: 'customers.view', label: 'Ver Clientes' },

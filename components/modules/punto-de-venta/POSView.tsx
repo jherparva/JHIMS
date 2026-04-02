@@ -512,7 +512,7 @@ export default function POSView() {
                 <div className={styles.headerLeft}>
                     <div className="flex flex-col">
                         <h1 className="text-xl font-black tracking-tighter text-slate-800 flex items-center gap-2">
-                            JHIMS <span className="text-violet-600">POS</span>
+                            JHIMS <span className="text-violet-600">Caja</span>
                             <div className={cn(
                                 "flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] uppercase font-bold",
                                 isOnline ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
@@ -858,7 +858,11 @@ export default function POSView() {
 
             <Dialog open={isArqueoOpen} onOpenChange={setIsArqueoOpen}>
                 <DialogContent className="max-w-md bg-white">
-                    <DialogHeader><DialogTitle className="flex items-center gap-2 font-black italic uppercase text-slate-800">Arqueo de Caja (Cierre)</DialogTitle></DialogHeader>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 font-black italic uppercase text-slate-800">
+                             JHIMS <span className="text-violet-600">Caja</span> - Arqueo
+                        </DialogTitle>
+                    </DialogHeader>
                     <div className="space-y-6 pt-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="p-4 bg-slate-50 rounded-2xl border font-bold">

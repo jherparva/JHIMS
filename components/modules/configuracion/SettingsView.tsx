@@ -240,7 +240,7 @@ export default function SettingsView() {
                                                 onChange={(e) => setCompany({ ...company, paymentQR: e.target.value })}
                                                 placeholder="Pega aquí el link de tu imagen de QR"
                                             />
-                                            <p className="text-[10px] text-muted-foreground">Sube tu QR a un servicio de imágenes y pega el enlace aquí para mostrarlo en el POS.</p>
+                                            <p className="text-[10px] text-muted-foreground">Sube tu QR a un servicio de imágenes y pega el enlace aquí para mostrarlo en el Punto de Venta.</p>
                                         </div>
                                     </div>
                                 </div>
