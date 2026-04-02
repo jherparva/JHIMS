@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
-import { Loader2, Image as ImageIcon, Globe, Upload, Trash2 } from "lucide-react"
+import { Loader2, Image as ImageIcon, Globe, Upload, Trash2, Scan } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -31,6 +31,7 @@ interface ProductDialogProps {
 export function ProductDialog({ open, onOpenChange, onSuccess, product }: ProductDialogProps) {
     const [loading, setLoading] = useState(false)
     const [categories, setCategories] = useState<any[]>([])
+    const [suppliers, setSuppliers] = useState<any[]>([])
     const [imagePreview, setImagePreview] = useState<string | null>(null)
     const { register, handleSubmit, reset, setValue, watch } = useForm()
 
@@ -39,11 +40,13 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
     useEffect(() => {
         if (open) {
             fetchCategories()
+            fetchSuppliers()
             if (product) {
                 // Initialize form with product data
                 setValue("name", product.name)
                 setValue("sku", product.sku)
                 setValue("categoryId", product.category?._id || product.categoryId)
+                setValue("supplierId", product.supplier?._id || product.supplierId || "")
                 setValue("salePrice", product.salePrice)
                 setValue("costPrice", product.purchasePrice || product.costPrice || 0)
                 setValue("stock", product.stock)
@@ -72,22 +75,38 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
         }
     }
 
+    const fetchSuppliers = async () => {
+        try {
+            const response = await fetch("/api/proveedores")
+            if (response.ok) {
+                const data = await response.json()
+                setSuppliers(Array.isArray(data) ? data : [])
+            }
+        } catch (error) {
+            console.error("Error fetching suppliers:", error)
+        }
+    }
+
     const onSubmit = async (data: any) => {
         setLoading(true)
         try {
             const url = product ? `/api/productos/${product._id}` : "/api/productos"
             const method = product ? "PUT" : "POST"
 
+            // Mapear "none" a null para el proveedor
+            const submitData = {
+                ...data,
+                salePrice: parseFloat(data.salePrice),
+                costPrice: parseFloat(data.costPrice || 0),
+                stock: parseInt(data.stock || 0),
+                minStock: parseInt(data.minStock || 0),
+                supplierId: data.supplierId === "none" ? null : data.supplierId
+            }
+
             const response = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    ...data,
-                    salePrice: parseFloat(data.salePrice),
-                    costPrice: parseFloat(data.costPrice || 0),
-                    stock: parseInt(data.stock || 0),
-                    minStock: parseInt(data.minStock || 0),
-                }),
+                body: JSON.stringify(submitData),
             })
 
             if (response.ok) {
@@ -114,7 +133,6 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
         reader.onloadend = () => {
             const tempImg = new Image()
             tempImg.onload = () => {
-                // Configurar el Canvas para compresión (max 800px)
                 const MAX_WIDTH = 800
                 const MAX_HEIGHT = 800
                 let width = tempImg.width
@@ -139,7 +157,6 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                 const ctx = canvas.getContext("2d")
                 if (ctx) {
                     ctx.drawImage(tempImg, 0, 0, width, height)
-                    // Exportar compreso como WEBP limitando tamaño de Base64
                     const compressedBase64 = canvas.toDataURL("image/webp", 0.7)
                     setValue("imageUrl", compressedBase64)
                     setImagePreview(compressedBase64)
@@ -157,134 +174,152 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[700px] max-h-[95vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{product ? "Editar Producto" : "Crear Nuevo Producto"}</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="name">Nombre *</Label>
-                            <Input id="name" {...register("name", { required: true })} placeholder="Ej: Camiseta Talla M" />
+                            <Label htmlFor="name">Nombre del Producto *</Label>
+                            <Input id="name" {...register("name", { required: true })} placeholder="Ej: Arroz Diana 1kg" />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="sku">SKU (Código) *</Label>
-                            <Input id="sku" {...register("sku", { required: true })} placeholder="Ej: CAM-M-001" />
+                            <Label htmlFor="sku" className="flex items-center gap-2">
+                                <Scan size={14} className="text-amber-500" /> SKU / Código de Barras *
+                            </Label>
+                            <Input 
+                                id="sku" 
+                                {...register("sku", { required: true })} 
+                                placeholder="Escanea o escribe el código..." 
+                                className="bg-amber-50/30 border-amber-200 focus-visible:ring-amber-500"
+                            />
+                            <p className="text-[10px] text-amber-600 font-medium italic">💡 Haz clic y escanea para capturar el código de barras</p>
                         </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label>Categoría *</Label>
-                        <Select 
-                            value={product?.category?._id || undefined}
-                            onValueChange={(value) => setValue("categoryId", value)}
-                        >
-                            <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Selecciona una categoría" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {categories.map((cat) => (
-                                    <SelectItem key={cat._id} value={cat._id}>
-                                        {cat.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <input type="hidden" {...register("categoryId", { required: true })} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <Label>Categoría *</Label>
+                            <Select 
+                                value={watch("categoryId") || undefined}
+                                onValueChange={(value) => setValue("categoryId", value)}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Selecciona categoría" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {categories.map((cat) => (
+                                        <SelectItem key={cat._id} value={cat._id}>{cat.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <input type="hidden" {...register("categoryId", { required: true })} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Proveedor (Opcional)</Label>
+                            <Select 
+                                value={watch("supplierId") || "none"}
+                                onValueChange={(value) => setValue("supplierId", value)}
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Selecciona proveedor" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Sin Proveedor (Local)</SelectItem>
+                                    {suppliers.map((sup) => (
+                                        <SelectItem key={sup._id} value={sup._id}>{sup.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <input type="hidden" {...register("supplierId")} />
+                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="salePrice">Precio Venta *</Label>
+                            <Label htmlFor="salePrice">PVenta *</Label>
                             <Input id="salePrice" type="number" step="0.01" {...register("salePrice", { required: true })} placeholder="0.00" />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="costPrice">Costo (Opcional)</Label>
+                            <Label htmlFor="costPrice">PCosto</Label>
                             <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="stock">Stock Actual</Label>
+                            <Label htmlFor="stock">Stock</Label>
                             <Input id="stock" type="number" {...register("stock")} placeholder="0" />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="minStock">Stock Mínimo</Label>
+                            <Label htmlFor="minStock">Min</Label>
                             <Input id="minStock" type="number" {...register("minStock")} placeholder="5" />
                         </div>
                     </div>
 
                     <div className="space-y-2">
                         <Label htmlFor="description">Descripción</Label>
-                        <Textarea id="description" {...register("description")} placeholder="Detalles del producto..." />
+                        <Textarea id="description" {...register("description")} placeholder="Detalles adicionales del producto..." rows={2} />
                     </div>
 
                     <div className="space-y-2">
                         <Label>Imagen del Producto</Label>
                         <input type="hidden" {...register("imageUrl")} />
-                        <div className="flex flex-col md:flex-row gap-6 p-4 border rounded-xl bg-slate-50/50">
-                            {/* Preview Section */}
-                            <div className="w-32 h-32 rounded-xl border-2 border-dashed border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 group relative">
+                        <div className="flex flex-col md:flex-row gap-4 p-3 border rounded-xl bg-slate-50/50">
+                            <div className="w-24 h-24 rounded-lg border-2 border-dashed border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 group relative">
                                 {imagePreview ? (
                                     <>
-                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-contain p-2" />
+                                        <img src={imagePreview} alt="Preview" className="w-full h-full object-contain p-1" />
                                         <button 
                                             type="button"
                                             onClick={() => { setImagePreview(null); setValue("imageUrl", ""); }}
                                             className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
                                         >
-                                            <Trash2 size={20} />
+                                            <Trash2 size={16} />
                                         </button>
                                     </>
                                 ) : (
-                                    <ImageIcon className="text-slate-300" size={32} />
+                                    <ImageIcon className="text-slate-300" size={24} />
                                 )}
                             </div>
 
-                            {/* Options Section */}
-                            <div className="flex-1 space-y-3">
+                            <div className="flex-1 space-y-2">
                                 <Tabs defaultValue="library" className="w-full">
-                                    <TabsList className="grid grid-cols-3 w-full h-9 p-1">
-                                        <TabsTrigger value="library" className="text-[10px] uppercase font-bold">Biblioteca</TabsTrigger>
-                                        <TabsTrigger value="url" className="text-[10px] uppercase font-bold">Web URL</TabsTrigger>
-                                        <TabsTrigger value="upload" className="text-[10px] uppercase font-bold">Subir</TabsTrigger>
+                                    <TabsList className="grid grid-cols-3 w-full h-8 p-1">
+                                        <TabsTrigger value="library" className="text-[9px] uppercase font-bold">Biblioteca</TabsTrigger>
+                                        <TabsTrigger value="url" className="text-[9px] uppercase font-bold">URL</TabsTrigger>
+                                        <TabsTrigger value="upload" className="text-[9px] uppercase font-bold">Archivo</TabsTrigger>
                                     </TabsList>
                                     
                                     <TabsContent value="library" className="pt-2">
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-6 gap-1">
                                             {PREDEFINED_IMAGES.map((img) => (
                                                 <button
                                                     key={img.name}
                                                     type="button"
                                                     onClick={() => selectPredefined(img.url)}
-                                                    className={`hover:scale-105 transition-transform p-0.5 border-2 rounded-lg overflow-hidden ${imagePreview === img.url ? 'border-violet-500' : 'border-transparent'}`}
+                                                    className={`hover:scale-110 transition-transform rounded border ${imagePreview === img.url ? 'border-violet-500' : 'border-transparent'}`}
                                                 >
-                                                    <img src={img.url} alt={img.name} className="w-full h-10 object-cover rounded-md" />
-                                                    <span className="text-[8px] block mt-0.5 truncate">{img.name}</span>
+                                                    <img src={img.url} alt={img.name} className="w-full h-6 object-cover rounded" />
                                                 </button>
                                             ))}
                                         </div>
                                     </TabsContent>
                                     
                                     <TabsContent value="url" className="pt-2">
-                                        <div className="flex gap-2">
-                                            <Input 
-                                                placeholder="https://ejemplo.com/imagen.jpg" 
-                                                className="h-8 text-xs" 
-                                                value={currentImageUrl || ""}
-                                                onChange={(e) => {
-                                                    setValue("imageUrl", e.target.value)
-                                                    setImagePreview(e.target.value)
-                                                }}
-                                            />
-                                        </div>
+                                        <Input 
+                                            placeholder="https://..." 
+                                            className="h-8 text-xs" 
+                                            value={currentImageUrl || ""}
+                                            onChange={(e) => {
+                                                setValue("imageUrl", e.target.value)
+                                                setImagePreview(e.target.value)
+                                            }}
+                                        />
                                     </TabsContent>
                                     
                                     <TabsContent value="upload" className="pt-2">
                                         <label className="flex items-center justify-center gap-2 w-full h-8 px-4 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-50 transition-colors">
-                                            <Upload size={14} className="text-slate-500" />
-                                            <span className="text-xs font-medium text-slate-600">Elegir de PC</span>
+                                            <Upload size={12} className="text-slate-500" />
+                                            <span className="text-[10px] font-medium text-slate-600">Subir Imagen</span>
                                             <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
                                         </label>
                                     </TabsContent>
@@ -293,11 +328,11 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4">
+                    <div className="flex justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-                        <Button type="submit" disabled={loading}>
+                        <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90">
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {product ? "Actualizar" : "Crear"} Producto
+                            {product ? "Guardar Cambios" : "Crear Producto"}
                         </Button>
                     </div>
                 </form>

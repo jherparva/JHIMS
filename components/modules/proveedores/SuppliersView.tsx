@@ -178,15 +178,22 @@ export default function SuppliersView() {
 
                             <div className={styles.supplierActions}>
                                 <button
+                                    onClick={() => window.location.href = `/inventario?supplierId=${supplier._id}`}
+                                    className="flex-1 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-100 flex items-center justify-center gap-2 text-sm font-bold"
+                                    title="Ver catálogo de este proveedor"
+                                >
+                                    <Truck size={16} />
+                                    Catálogo
+                                </button>
+                                <button
                                     onClick={() => openEditDialog(supplier)}
-                                    className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 flex items-center justify-center gap-2"
+                                    className="px-3 py-2 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 flex items-center justify-center gap-2"
                                 >
                                     <Edit size={16} />
-                                    Editar
                                 </button>
                                 <button
                                     onClick={() => handleDelete(supplier._id)}
-                                    className="px-3 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100"
+                                    className="px-3 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 text-red-500"
                                 >
                                     <Trash2 size={16} />
                                 </button>

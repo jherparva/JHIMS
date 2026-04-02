@@ -25,10 +25,16 @@ export default function InventoryView() {
     const [products, setProducts] = useState<Product[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
+    const [supplierFilter, setSupplierFilter] = useState<string | null>(null)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
 
     useEffect(() => {
+        // Leer filtro de proveedor de la URL si existe
+        const params = new URLSearchParams(window.location.search)
+        const sId = params.get("supplierId")
+        if (sId) setSupplierFilter(sId)
+        
         fetchProducts()
     }, [])
 
@@ -46,10 +52,16 @@ export default function InventoryView() {
         }
     }
 
-    const filteredProducts = products.filter((product) =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    const filteredProducts = products.filter((product) => {
+        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                             product.sku.toLowerCase().includes(searchTerm.toLowerCase())
+        
+        const matchesSupplier = !supplierFilter || 
+                               (product as any).supplier?._id === supplierFilter || 
+                               (product as any).supplier === supplierFilter
+        
+        return matchesSearch && matchesSupplier
+    })
 
     const totalProducts = products.length
     const lowStockProducts = products.filter(p => p.stock <= p.minStock).length
