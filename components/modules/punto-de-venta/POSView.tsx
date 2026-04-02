@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import styles from './pos.module.css'
-import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, CheckCircle2, FileText, Wallet, LogOut, Banknote, Landmark, Pencil, Loader2, Wifi, WifiOff, RefreshCw } from 'lucide-react'
+import { Search, Plus, Minus, Trash2, ShoppingCart, Printer, CheckCircle2, FileText, Wallet, LogOut, Banknote, Landmark, Pencil, Loader2, Wifi, WifiOff, RefreshCw, Monitor } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -56,6 +56,10 @@ export default function POSView() {
     const [isOpeningBoxOpen, setIsOpeningBoxOpen] = useState(false)
     const [openingAmount, setOpeningAmount] = useState("0")
     
+    // PWA & INSTALL STATES
+    const [installPrompt, setInstallPrompt] = useState<any>(null)
+    const [showInstallBtn, setShowInstallBtn] = useState(false)
+
     // OFFLINE & SYNC STATES
     const [isOnline, setIsOnline] = useState(true)
     const [isSyncing, setIsSyncing] = useState(false)
@@ -156,11 +160,35 @@ export default function POSView() {
         // Cargar conteo inicial de pendientes
         jhimsOffline.getPendingSales().then(p => setPendingSalesCount(p.length))
         
+        // PWA - Capturar evento de instalación
+        const handleBeforeInstall = (e: any) => {
+            e.preventDefault()
+            setInstallPrompt(e)
+            setShowInstallBtn(true)
+        }
+        window.addEventListener("beforeinstallprompt", handleBeforeInstall)
+
+        // Ocultar si ya está instalada
+        if (window.matchMedia("(display-mode: standalone)").matches) {
+            setShowInstallBtn(false)
+        }
+
         return () => {
             window.removeEventListener('online', handleOnline)
             window.removeEventListener('offline', handleOffline)
+            window.removeEventListener("beforeinstallprompt", handleBeforeInstall)
         }
     }, [])
+
+    const handleInstall = async () => {
+        if (!installPrompt) return
+        installPrompt.prompt()
+        const { outcome } = await installPrompt.userChoice
+        if (outcome === "accepted") {
+            setInstallPrompt(null)
+            setShowInstallBtn(false)
+        }
+    }
 
     const fetchStats = async () => {
         try {
@@ -491,6 +519,17 @@ export default function POSView() {
                 </div>
                 
                 <div className="flex items-center gap-3">
+                    {showInstallBtn && (
+                        <Button 
+                            onClick={handleInstall}
+                            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl h-9 px-4 font-bold text-[10px] uppercase shadow-lg shadow-violet-200 gap-2 border-none"
+                        >
+                            <Monitor size={14} /> Instalar APP
+                        </Button>
+                    )}
+
+                    <div className="h-4 w-px bg-slate-200 mx-1" />
+
                     {/* Botón de cierre de caja rápido */}
                     <Button 
                         variant="ghost" 

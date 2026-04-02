@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { PWAInstall } from "@/components/PWAInstall";
 
 // Fuente tipográfica para la aplicación
 const inter = Inter({ subsets: ["latin"] });
@@ -54,7 +53,6 @@ export default function RootLayout({
                 >
                     {/* children: Contenido dinámico de cada página */}
                     {children}
-                    <PWAInstall />
                     <Toaster position="top-center" richColors />
                     
                     {/* Registro de Service Worker para Modo Offline y App en PC */}
