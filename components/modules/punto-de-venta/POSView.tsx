@@ -166,7 +166,20 @@ export default function POSView() {
             setInstallPrompt(e)
             setShowInstallBtn(true)
         }
+
+        // Si el evento ya ocurrió antes de montar (capturado en layout.tsx)
+        if ((window as any).deferredPrompt) {
+            setInstallPrompt((window as any).deferredPrompt)
+            setShowInstallBtn(true)
+        }
+
         window.addEventListener("beforeinstallprompt", handleBeforeInstall)
+        window.addEventListener("pwa-installable", () => {
+            if ((window as any).deferredPrompt) {
+                setInstallPrompt((window as any).deferredPrompt)
+                setShowInstallBtn(true)
+            }
+        })
 
         // Ocultar si ya está instalada
         if (window.matchMedia("(display-mode: standalone)").matches) {
@@ -181,11 +194,14 @@ export default function POSView() {
     }, [])
 
     const handleInstall = async () => {
-        if (!installPrompt) return
-        installPrompt.prompt()
-        const { outcome } = await installPrompt.userChoice
+        const prompt = installPrompt || (window as any).deferredPrompt
+        if (!prompt) return
+        
+        prompt.prompt()
+        const { outcome } = await prompt.userChoice
         if (outcome === "accepted") {
             setInstallPrompt(null)
+            ;(window as any).deferredPrompt = null
             setShowInstallBtn(false)
         }
     }

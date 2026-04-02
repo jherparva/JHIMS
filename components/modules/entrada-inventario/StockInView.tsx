@@ -19,6 +19,7 @@ interface IProduct {
     _id: string
     name: string
     purchasePrice: number
+    supplier?: { _id: string; name: string } | string
 }
 
 interface IStockInItem {
@@ -39,12 +40,28 @@ interface IStockInLog {
 export default function StockInView() {
     const [suppliers, setSuppliers] = useState<ISupplier[]>([])
     const [products, setProducts] = useState<IProduct[]>([])
+    const [filteredProducts, setFilteredProducts] = useState<IProduct[]>([])
     const [logs, setLogs] = useState<IStockInLog[]>([])
 
     // Form State
     const [selectedSupplier, setSelectedSupplier] = useState<string>("")
     const [referenceNumber, setReferenceNumber] = useState<string>("")
     const [items, setItems] = useState<IStockInItem[]>([])
+
+    // Filtrar productos por proveedor
+    useEffect(() => {
+        if (!selectedSupplier || selectedSupplier === "none") {
+            setFilteredProducts([])
+            return
+        }
+        
+        const filtered = products.filter(p => {
+            const supId = typeof p.supplier === 'object' ? (p.supplier as any)?._id : p.supplier
+            return supId === selectedSupplier
+        })
+        setFilteredProducts(filtered)
+        setCurrentItemId("")
+    }, [selectedSupplier, products])
 
     // Current Item Input state
     const [currentItemId, setCurrentItemId] = useState<string>("")
@@ -227,15 +244,21 @@ export default function StockInView() {
                         <div className="p-4 bg-slate-50 border rounded-lg space-y-4">
                             <div className="space-y-2">
                                 <Label>Producto</Label>
-                                <Select value={currentItemId} onValueChange={handleProductSelect}>
+                                <Select 
+                                    value={currentItemId} 
+                                    onValueChange={handleProductSelect}
+                                    disabled={!selectedSupplier || selectedSupplier === "none"}
+                                >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Buscar producto..." />
+                                        <SelectValue placeholder={!selectedSupplier ? "Seleccione proveedor primero" : "Buscar producto..."} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {products.length === 0 ? (
-                                            <SelectItem value="none" disabled>No cargados</SelectItem>
+                                        {filteredProducts.length === 0 ? (
+                                            <SelectItem value="none" disabled>
+                                                {!selectedSupplier ? "Debe seleccionar un proveedor" : "No hay productos de este proveedor"}
+                                            </SelectItem>
                                         ) : (
-                                            products.map(p => (
+                                            filteredProducts.map(p => (
                                                 <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
                                             ))
                                         )}

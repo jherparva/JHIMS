@@ -58,6 +58,15 @@ export default function RootLayout({
                     {/* Registro de Service Worker para Modo Offline y App en PC */}
                     <script dangerouslySetInnerHTML={{
                         __html: `
+                        // Capturar el prompt de instalación de forma global e inmediata
+                        window.addEventListener('beforeinstallprompt', (e) => {
+                            e.preventDefault();
+                            window.deferredPrompt = e;
+                            console.log('Capture installer event');
+                            // Disparar un evento personalizado para que React se entere
+                            window.dispatchEvent(new CustomEvent('pwa-installable'));
+                        });
+
                         if ('serviceWorker' in navigator) {
                             window.addEventListener('load', function() {
                                 navigator.serviceWorker.register('/sw.js').then(function(registration) {

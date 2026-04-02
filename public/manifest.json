@@ -1,7 +1,7 @@
 {
-  "name": "JHIMS Inventory Management",
+  "name": "JHIMS Inventory",
   "short_name": "JHIMS",
-  "description": "Sistema de gestión de inventario y ventas JHIMS",
+  "description": "JHIMS Inventory Management System",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020617",
