@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect } from \"react\"
+import * as XLSX from 'xlsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -190,74 +191,55 @@ export default function ReportsView() {
         const totalCompras = data.dailySummary.reduce((acc: number, curr: any) => acc + curr.compras, 0);
         const balance = totalVentas - totalCompras;
 
-        const styles = `
-            <style>
-                .header-title { font-size: 18pt; font-weight: bold; color: #059669; }
-                .subtitle { font-size: 14pt; font-weight: bold; color: #374151; }
-                .label { font-weight: bold; background-color: #f3f4f6; }
-                .total-ingresos { background-color: #d1fae5; color: #065f46; font-weight: bold; }
-                .total-inversion { background-color: #fee2e2; color: #991b1b; font-weight: bold; }
-                .total-balance { background-color: #dbeafe; color: #1e40af; font-weight: bold; }
-                .table-header { background-color: #1f2937; color: #ffffff; font-weight: bold; }
-                .row-even { background-color: #f9fafb; }
-                .number { text-align: right; }
-                td, th { border: 1px solid #e5e7eb; padding: 5px; }
-            </style>
-        `;
+        // 1. Crear el arreglo de datos para el Excel
+        const rows = [
+            ["JHIMS - REPORTE DE RENDIMIENTO"],
+            [data.company?.name || "N/A"],
+            ["NIT:", data.company?.taxId || "N/A"],
+            ["Periodo:", `${dateRange.from} al ${dateRange.to}`],
+            ["Fecha Generación:", new Date().toLocaleString()],
+            [], // Espacio
+            ["RESUMEN FINANCIERO"],
+            ["(+) TOTAL INGRESOS", totalVentas],
+            ["(-) TOTAL INVERSIONES", totalCompras],
+            ["(=) BALANCE OPERATIVO", balance],
+            [], // Espacio
+            ["DESGLOSE DIARIO"],
+            ["Fecha", "Día", "Ventas ($)", "Compras ($)", "Balance ($)"]
+        ];
 
-        const htmlContent = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="utf-8">
-                ${styles}
-            </head>
-            <body>
-                <table>
-                    <tr><td colspan="5" class="header-title">JHIMS - SISTEMA DE GESTIÓN DE INVENTARIOS</td></tr>
-                    <tr><td colspan="5" class="subtitle">REPORTE DE RENDIMIENTO OPERATIVO</td></tr>
-                    <tr><td></td></tr>
-                    <tr><td colspan="5" class="label">INFORMACIÓN DE LA EMPRESA</td></tr>
-                    <tr><td class="label">Empresa:</td><td colspan="4">${data.company?.name || 'N/A'}</td></tr>
-                    <tr><td class="label">NIT:</td><td colspan="4">${data.company?.taxId || 'N/A'}</td></tr>
-                    <tr><td class="label">Periodo:</td><td colspan="4">${dateRange.from} al ${dateRange.to}</td></tr>
-                    <tr><td class="label">Fecha Generación:</td><td colspan="4">${new Date().toLocaleString()}</td></tr>
-                    <tr><td></td></tr>
-                    <tr><td colspan="5" class="label">RESUMEN FINANCIERO DEL PERIODO</td></tr>
-                    <tr><td colspan="2" class="total-ingresos">(+) TOTAL INGRESOS POR VENTAS:</td><td colspan="3" class="total-ingresos number">${Math.round(totalVentas)}</td></tr>
-                    <tr><td colspan="2" class="total-inversion">(-) TOTAL INVERSIÓN EN COMPRAS:</td><td colspan="3" class="total-inversion number">${Math.round(totalCompras)}</td></tr>
-                    <tr><td colspan="2" class="total-balance">(=) BALANCE OPERATIVO:</td><td colspan="3" class="total-balance number">${Math.round(balance)}</td></tr>
-                    <tr><td></td></tr>
-                    <tr><td colspan="5" class="label">DESGLOSE DIARIO DETALLADO</td></tr>
-                    <tr class="table-header">
-                        <th>Fecha</th>
-                        <th>Día</th>
-                        <th>Ventas ($)</th>
-                        <th>Compras ($)</th>
-                        <th>Balance ($)</th>
-                    </tr>
-                    ${data.dailySummary.map((d: any, i: number) => `
-                        <tr class="${i % 2 === 0 ? 'row-even' : ''}">
-                            <td>${d.fullDate}</td>
-                            <td>${d.name.replace(".", "")}</td>
-                            <td class="number">${Math.round(d.ventas)}</td>
-                            <td class="number">${Math.round(d.compras)}</td>
-                            <td class="number">${Math.round(d.ventas - d.compras)}</td>
-                        </tr>
-                    `).join('')}
-                </table>
-            </body>
-            </html>
-        `;
+        // 2. Agregar los datos diarios
+        data.dailySummary.forEach((d: any) => {
+            rows.push([
+                d.fullDate,
+                d.name.replace(".", ""),
+                d.ventas,
+                d.compras,
+                d.ventas - d.compras
+            ]);
+        });
 
-        const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Reporte_JHIMS_${data.company?.name || 'Ventas'}.xls`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("Excel Profesional generado con éxito");
+        // 3. Crear el libro y la hoja
+        const worksheet = XLSX.utils.aoa_to_sheet(rows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Reporte JHIMS");
+
+        // 4. Ajustar anchos de columna básicos
+        if (worksheet['!cols']) {
+            worksheet['!cols'] = [
+                { wch: 15 }, // Fecha
+                { wch: 12 }, // Día
+                { wch: 15 }, // Ventas
+                { wch: 15 }, // Compras
+                { wch: 15 }  // Balance
+            ];
+        }
+
+        // 5. Generar y descargar
+        const fileName = `Reporte_JHIMS_${(data.company?.name || "Ventas").replace(/\s/g, "_")}.xlsx`;
+        XLSX.writeFile(workbook, fileName);
+        
+        toast.success("Excel Profesional generado sin errores");
     }
 
     if (loading) {
