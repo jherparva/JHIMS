@@ -70,7 +70,24 @@ export const PUT = withSessionContext(async (req: NextRequest, context: any) => 
     try {
         await connectDB()
         const body = await req.json()
-        const { name, taxId, address, phone, paymentQR, paymentInfo } = body
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { companySchema } = await import("@/lib/validations/company")
+        const validation = companySchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { 
+                    error: "Datos de empresa inválidos", 
+                    details: validation.error.format() 
+                },
+                { status: 400 }
+            )
+        }
+
+        const { name, taxId, address, phone, paymentQR, paymentInfo } = validation.data
 
         // 1. Obtener el companyId real desde el usuario en la DB (por si la sesión está mal)
         // PERO SOLO para usuarios que NO sean superadmin

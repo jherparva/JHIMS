@@ -11,9 +11,13 @@ import { jwtVerify } from 'jose'
 // CONFIGURACIÓN
 // =============================================================================
 // Clave secreta para tokens JWT
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.NEXTAUTH_SECRET || 'jhims-secret-key-2025'
-)
+// RECOMENDADO: Eliminar el fallback para forzar el uso de variables de entorno seguras
+const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
+if (!secret && process.env.NODE_ENV === 'production') {
+    console.error("MIDDLEWARE [CRITICAL]: No JWT secret found in production environment!");
+}
+
+const JWT_SECRET = new TextEncoder().encode(secret || 'jhims-temporary-development-key');
 
 // =============================================================================
 // RUTAS POR ROL
@@ -34,14 +38,12 @@ const ADMIN_ONLY_PATHS = [
 const SUPERADMIN_PATHS = ['/super-administrador']
 
 // Rutas públicas (sin autenticación)
+// SEGURIDAD: Eliminadas las rutas de semilla (seed) y pruebas de base de datos
 const PUBLIC_PATHS = [
     '/inicio-sesion',                           // Login
     '/olvide-contrasena',                      // Recuperar contraseña
     '/api/autenticacion/login',                // API login
     '/api/autenticacion/recuperar-password',   // API recuperación
-    '/api/seed',                               // API inicialización
-    '/api/test-db',                            // API test BD
-    '/api/seed-data'                           // API carga datos
 ]
 
 // =============================================================================
@@ -141,7 +143,6 @@ export async function middleware(request: NextRequest) {
                 maxAge: 60 * 60 * 24,             // 24 horas
                 path: "/",
             })
-            console.log(`MIDDLEWARE [INFO]: WindowId para usuario: ${userId}`)
         }
 
         // =============================================================================
@@ -173,46 +174,18 @@ export async function middleware(request: NextRequest) {
 
     } catch (e: any) {
         // =============================================================================
-        // 7. RECUPERACIÓN (PRODUCCIÓN)
+        // 7. MANEJO DE ERRORES DE AUTENTICACIÓN
         // =============================================================================
-        // Si falla JWT, intenta decodificar sin verificar firma
-        try {
-            const { decodeJwt } = await import('jose')
-            const decoded = decodeJwt(token)
-            
-            if (decoded && decoded.role) {
-                console.warn(`MIDDLEWARE [RECOVERY]: Acceso vía Decode: ${decoded.id}`)
-                
-                const response = NextResponse.next()
-                const role = decoded.role as string
-                const isSuperAdminPath = SUPERADMIN_PATHS.some(p => pathname.startsWith(p))
-
-                if (role === 'superadmin') {
-                    if (!isSuperAdminPath && !pathname.startsWith('/api')) {
-                        return NextResponse.redirect(new URL('/super-administrador', request.url))
-                    }
-                    return response
-                }
-
-                if (isSuperAdminPath) {
-                    return NextResponse.redirect(new URL('/dashboard', request.url))
-                }
-
-                return response
-            }
-        } catch (decodeError) {
-            console.error("MIDDLEWARE: Error decodificación", decodeError)
-        }
-
-        // =============================================================================
-        // 8. REDIRECCIÓN FINAL
-        // =============================================================================
-        console.error("MIDDLEWARE: Token inválido, redirigiendo login", e.message)
+        // SEGURIDAD: Eliminado el bloque de recuperación vía decodeJwt de forma insegura.
+        // Si el token es inválido o ha expirado, debe re-autenticarse.
+        
+        console.error("MIDDLEWARE [AUTH ERROR]:", e.message)
         const response = NextResponse.redirect(new URL('/inicio-sesion', request.url))
-        response.cookies.delete('jhims-auth-token')  // Eliminar token
+        response.cookies.delete('jhims-auth-token')
         return response
     }
 }
+
 
 // =============================================================================
 // CONFIGURACIÓN DE RUTAS A INTERCEPTAR

@@ -60,18 +60,24 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         await connectDB()
 
         const body = await req.json()
-        console.log("POST /api/products body:", body)
-        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description } = body
-
+        
         // =============================================================================
-        // 1. VALIDACIONES
+        // 1. VALIDACIÓN CON ZOD
         // =============================================================================
-        if (!name || !sku || !salePrice) {
+        const { productSchema } = await import("@/lib/validations/product")
+        const validation = productSchema.safeParse(body)
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "Nombre, SKU y precio de venta son requeridos" },
+                { 
+                    error: "Datos de entrada inválidos", 
+                    details: validation.error.format() 
+                },
                 { status: 400 }
             )
         }
+
+        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description } = validation.data
 
         // Verificar SKU único por compañía
         const existingProduct = await Product.findOne({ sku })

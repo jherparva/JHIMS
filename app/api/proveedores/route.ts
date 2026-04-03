@@ -26,14 +26,24 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         await connectDB()
 
         const body = await req.json()
-        const { name, contactName, email, phone, address, taxId, companyId } = body
-
-        if (!name) {
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { supplierSchema } = await import("@/lib/validations/supplier")
+        const validation = supplierSchema.safeParse(body)
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "El nombre es requerido" },
+                { 
+                    error: "Datos de proveedor inválidos", 
+                    details: validation.error.format() 
+                },
                 { status: 400 }
             )
         }
+
+        const { name, contactName, email, phone, address, taxId, companyId } = validation.data
 
         // Si se provee companyId en el body, lo usamos (ej. superadmin o migraciones)
         // De lo contrario, usamos el de la sesión (context.companyId) obligatoriamente para 

@@ -27,7 +27,21 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
     try {
         await connectDB()
         const body = await req.json()
-        const { openingAmount } = body
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { openCashSessionSchema } = await import("@/lib/validations/cash-session")
+        const validation = openCashSessionSchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: "Monto de apertura inválido", details: validation.error.format() },
+                { status: 400 }
+            )
+        }
+
+        const { openingAmount } = validation.data
 
         // 1. Verificar si ya hay una caja abierta (No se puede abrir dos a la vez por usuario)
         const existingSession = await CashSession.findOne({
@@ -59,7 +73,21 @@ export const PUT = withSessionContext(async (req: NextRequest, context: any) => 
     try {
         await connectDB()
         const body = await req.json()
-        const { closingAmount, notes } = body
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { closeCashSessionSchema } = await import("@/lib/validations/cash-session")
+        const validation = closeCashSessionSchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: "Datos de cierre inválidos", details: validation.error.format() },
+                { status: 400 }
+            )
+        }
+
+        const { closingAmount, notes } = validation.data
 
         // 1. Obtener sesión abierta
         const activeSession = await CashSession.findOne({

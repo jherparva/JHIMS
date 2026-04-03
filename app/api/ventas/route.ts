@@ -13,13 +13,22 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
     try {
         await connectDB()
         const body = await req.json()
-        const { items, total, paymentMethod, customer, amountPaid: amountPaidBody } = body
-
-        if (!items || items.length === 0) {
-            return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 })
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { createSaleSchema } = await import("@/lib/validations/sale")
+        const validation = createSaleSchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { error: "Datos de venta inválidos", details: validation.error.format() },
+                { status: 400 }
+            )
         }
 
-        const amountPaid = Number(amountPaidBody) || 0
+        const { items, total, paymentMethod, customer } = validation.data
+        const amountPaid = validation.data.amountPaid ?? 0
         const balance = Math.max(0, total - amountPaid)
         let paymentStatus: "paid" | "partial" | "pending" = "paid"
         

@@ -26,14 +26,24 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         await connectDB()
 
         const body = await req.json()
-        const { name, email, phone, address, taxId } = body
-
-        if (!name) {
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { customerSchema } = await import("@/lib/validations/customer")
+        const validation = customerSchema.safeParse(body)
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "El nombre es requerido" },
+                { 
+                    error: "Datos de cliente inválidos", 
+                    details: validation.error.format() 
+                },
                 { status: 400 }
             )
         }
+
+        const { name, email, phone, address, taxId } = validation.data
 
         const customer = await Customer.create({
             name,

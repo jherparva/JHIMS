@@ -26,14 +26,24 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         await connectDB()
 
         const body = await req.json()
-        const { name, description } = body
-
-        if (!name) {
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { categorySchema } = await import("@/lib/validations/category")
+        const validation = categorySchema.safeParse(body)
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "El nombre es requerido" },
+                { 
+                    error: "Datos de categoría inválidos", 
+                    details: validation.error.format() 
+                },
                 { status: 400 }
             )
         }
+
+        const { name, description } = validation.data
 
         const category = await Category.create({
             name,

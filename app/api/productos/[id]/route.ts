@@ -40,7 +40,24 @@ export const PUT = withSessionContext(async (
         await connectDB()
 
         const body = await req.json()
-        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description, hasVariants, variants } = body
+        
+        // =============================================================================
+        // 1. VALIDACIÓN CON ZOD
+        // =============================================================================
+        const { productSchema } = await import("@/lib/validations/product")
+        const validation = productSchema.safeParse(body)
+        
+        if (!validation.success) {
+            return NextResponse.json(
+                { 
+                    error: "Datos de entrada inválidos", 
+                    details: validation.error.format() 
+                },
+                { status: 400 }
+            )
+        }
+
+        const { name, sku, categoryId, supplierId, costPrice, salePrice, stock, minStock, description, hasVariants, variants, imageUrl } = validation.data
 
         // Verificar SKU único (excepto el producto actual)
         if (sku) {
@@ -68,7 +85,7 @@ export const PUT = withSessionContext(async (
                 stock: stock || 0,
                 minStock: minStock || 0,
                 description,
-                imageUrl: body.imageUrl || body.image || null,
+                imageUrl: imageUrl || null,
                 hasVariants,
                 variants: variants || []
             },

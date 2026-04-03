@@ -20,17 +20,24 @@ export async function POST(req: NextRequest) {
         await connectDB()
 
         const body = await req.json()
-        const { username, password, rememberMe } = body
-
+        
         // =============================================================================
-        // 1. VALIDAR CAMPOS
+        // 1. VALIDAR CAMPOS CON ZOD
         // =============================================================================
-        if (!username || !password) {
+        const { loginSchema } = await import("@/lib/validations/auth")
+        const validation = loginSchema.safeParse(body)
+        
+        if (!validation.success) {
             return NextResponse.json(
-                { error: "Usuario y contraseña son requeridos" },
+                { 
+                    error: "Datos de entrada inválidos", 
+                    details: validation.error.format() 
+                },
                 { status: 400 }
             )
         }
+
+        const { username, password, rememberMe } = validation.data
 
         // =============================================================================
         // 2. BUSCAR USUARIO
