@@ -56,9 +56,6 @@ export default function POSView() {
     const [isOpeningBoxOpen, setIsOpeningBoxOpen] = useState(false)
     const [openingAmount, setOpeningAmount] = useState("0")
     
-    // PWA & INSTALL STATES
-    const [installPrompt, setInstallPrompt] = useState<any>(null)
-    const [showInstallBtn, setShowInstallBtn] = useState(false)
 
     // OFFLINE & SYNC STATES
     const [isOnline, setIsOnline] = useState(true)
@@ -160,51 +157,13 @@ export default function POSView() {
         // Cargar conteo inicial de pendientes
         jhimsOffline.getPendingSales().then(p => setPendingSalesCount(p.length))
         
-        // PWA - Capturar evento de instalación
-        const handleBeforeInstall = (e: any) => {
-            e.preventDefault()
-            setInstallPrompt(e)
-            setShowInstallBtn(true)
-        }
-
-        // Si el evento ya ocurrió antes de montar (capturado en layout.tsx)
-        if ((window as any).deferredPrompt) {
-            setInstallPrompt((window as any).deferredPrompt)
-            setShowInstallBtn(true)
-        }
-
-        window.addEventListener("beforeinstallprompt", handleBeforeInstall)
-        window.addEventListener("pwa-installable", () => {
-            if ((window as any).deferredPrompt) {
-                setInstallPrompt((window as any).deferredPrompt)
-                setShowInstallBtn(true)
-            }
-        })
-
-        // Ocultar si ya está instalada
-        if (window.matchMedia("(display-mode: standalone)").matches) {
-            setShowInstallBtn(false)
-        }
 
         return () => {
             window.removeEventListener('online', handleOnline)
             window.removeEventListener('offline', handleOffline)
-            window.removeEventListener("beforeinstallprompt", handleBeforeInstall)
         }
     }, [])
 
-    const handleInstall = async () => {
-        const prompt = installPrompt || (window as any).deferredPrompt
-        if (!prompt) return
-        
-        prompt.prompt()
-        const { outcome } = await prompt.userChoice
-        if (outcome === "accepted") {
-            setInstallPrompt(null)
-            ;(window as any).deferredPrompt = null
-            setShowInstallBtn(false)
-        }
-    }
 
     const fetchStats = async () => {
         try {
@@ -545,14 +504,6 @@ export default function POSView() {
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    {showInstallBtn && (
-                        <Button 
-                            onClick={handleInstall}
-                            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl h-9 px-4 font-bold text-[10px] uppercase shadow-lg shadow-violet-200 gap-2 border-none"
-                        >
-                            <Monitor size={14} /> Instalar APP
-                        </Button>
-                    )}
 
                     <div className="h-4 w-px bg-slate-200 mx-1" />
 
