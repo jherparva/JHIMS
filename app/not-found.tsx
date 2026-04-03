@@ -17,12 +17,12 @@ export default function NotFound() {
       </h1>
       
       <h2 className="text-3xl font-bold mb-4 text-foreground">
-        Página No Encontrada
+        ¡Vaya! Algo no salió como esperábamos
       </h2>
       
       <p className="text-muted-foreground max-w-md mb-8 leading-relaxed">
-        Lo sentimos, no pudimos encontrar la página que estás buscando. 
-        Es posible que haya sido movida, eliminada o que el enlace sea incorrecto.
+        El error que estás viendo (404) indica que el recurso o la página que buscas no está disponible. 
+        Esto puede deberse a que el enlace ha cambiado o que la función ha sido desactivada por seguridad.
       </p>
       
       <div className="flex flex-col sm:flex-row gap-4">

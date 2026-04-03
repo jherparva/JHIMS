@@ -71,7 +71,16 @@ export function CreateProductDialog({ onProductCreated }: CreateProductDialogPro
                 onProductCreated()
             } else {
                 const error = await response.json()
-                toast.error(error.error || "Error al crear producto")
+                // Extraer mensaje específico de Zod si existe
+                let errorMsg = error.error || "Error al crear producto"
+                if (error.details) {
+                    const firstField = Object.keys(error.details)[0]
+                    const details = error.details[firstField]
+                    if (details && details._errors && details._errors.length > 0) {
+                        errorMsg = `${firstField}: ${details._errors[0]}`
+                    }
+                }
+                toast.error(errorMsg)
             }
         } catch (error) {
             toast.error("Error de conexión")

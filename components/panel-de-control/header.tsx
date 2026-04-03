@@ -21,7 +21,7 @@ import { useState, useEffect } from "react"
 import { getAllFromLocal, isOnline } from "@/lib/offline-storage"
 import { NotificationsModal } from "./NotificationsModal"
 import { useLayout } from "@/components/proveedores-componentes/LayoutProvider"
-import { LayoutDashboard, List } from "lucide-react"
+import { LayoutDashboard, List, Monitor } from "lucide-react"
 import { Logo } from "@/components/logo"
 
 interface HeaderProps {
@@ -35,6 +35,10 @@ export function Header({ user }: HeaderProps) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOnlineStatus, setIsOnlineStatus] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  
+  // PWA Install Prompt
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [showInstallBtn, setShowInstallBtn] = useState(false)
 
   useEffect(() => {
     // Establecer estado inicial de conexión
@@ -47,11 +51,34 @@ export function Header({ user }: HeaderProps) {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
+    // Capturar Install Prompt
+    const handleBeforeInstall = (e: any) => {
+        e.preventDefault()
+        setInstallPrompt(e)
+        setShowInstallBtn(true)
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall)
+
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+        setShowInstallBtn(false)
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall)
     }
   }, [])
+
+  const handleInstall = async () => {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === "accepted") {
+        setInstallPrompt(null)
+        setShowInstallBtn(false)
+    }
+  }
 
   useEffect(() => {
     loadNotifications()
@@ -162,6 +189,19 @@ export function Header({ user }: HeaderProps) {
               </>
             )}
           </div>
+
+          {/* Botón de Instalar APP */}
+          {showInstallBtn && (
+            <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleInstall}
+                className="hidden lg:flex bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100 font-bold text-xs rounded-xl h-9 px-3 gap-2"
+            >
+                <Monitor className="h-4 w-4" />
+                <span>Instalar JHIMS</span>
+            </Button>
+          )}
 
           <Button variant="ghost" size="icon" className="relative" onClick={() => {
             console.log("🔍 Header: Abriendo modal de notificaciones")
