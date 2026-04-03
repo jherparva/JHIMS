@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import {
     Building2, Users, CheckCircle2, XCircle, Clock,
     Globe, Crown, RefreshCw, Ban, Power, Trash2, ShieldCheck,
-    TrendingUp, ChevronDown, X, UserPlus, Mail, Lock, User, Eye, EyeOff
+    TrendingUp, ChevronDown, X, UserPlus, Mail, Lock, User, Eye, EyeOff,
+    AlertTriangle
 } from "lucide-react"
 import { toast } from "sonner"
 import TicketsManager from "./TicketsManager"
@@ -52,23 +53,95 @@ function formatCOP(amount: number) {
     return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", minimumFractionDigits: 0 }).format(amount)
 }
 
+// ─── Diálogo de confirmación reutilizable (reemplaza window.confirm) ───
+function ConfirmDialog({
+    open, title, description, confirmLabel = "Confirmar", cancelLabel = "Cancelar",
+    danger = false, loading = false, onConfirm, onCancel
+}: {
+    open: boolean
+    title: string
+    description: string
+    confirmLabel?: string
+    cancelLabel?: string
+    danger?: boolean
+    loading?: boolean
+    onConfirm: () => void
+    onCancel: () => void
+}) {
+    if (!open) return null
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+                <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        danger ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                        <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-white text-base">{title}</h3>
+                        <p className="text-slate-400 text-sm mt-1">{description}</p>
+                    </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                    <button
+                        onClick={onCancel}
+                        disabled={loading}
+                        className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                        {cancelLabel}
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        disabled={loading}
+                        className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 ${
+                            danger 
+                                ? 'bg-red-600 hover:bg-red-700 text-white' 
+                                : 'bg-amber-600 hover:bg-amber-700 text-white'
+                        }`}
+                    >
+                        {loading && <RefreshCw className="h-4 w-4 animate-spin" />}
+                        {confirmLabel}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ─── Modal de acciones ─────────────────────────────────────────────
 function ActionModal({
     company, onClose, onChangeStatus, onChangePlan, onDelete, onUpdateBusiness
 }: {
     company: CompanyData
     onClose: () => void
-    onChangeStatus: (id: string, status: string) => void
-    onChangePlan: (id: string, plan: string) => void
-    onDelete: (id: string, name: string) => void
-    onUpdateBusiness: (id: string, type: string, initCategories?: boolean) => void
+    onChangeStatus: (id: string, status: string) => Promise<void> | void
+    onChangePlan: (id: string, plan: string) => Promise<void> | void
+    onDelete: (id: string, name: string) => Promise<void> | void
+    onUpdateBusiness: (id: string, type: string, initCategories?: boolean) => Promise<void> | void
 }) {
     const statusCfg = STATUS_CONFIG[company.status] || STATUS_CONFIG.pending
     const planCfg = PLAN_CONFIG[company.plan] || PLAN_CONFIG.free
     const [selectedType, setSelectedType] = useState(company.businessType || "tienda")
     const [isInitializing, setIsInitializing] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+
+    const handleDelete = async () => {
+        setIsDeleting(true)
+        setShowDeleteConfirm(false)
+        try {
+            await onDelete(company._id, company.name)
+            onClose()
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
 
     return (
+        <>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
             <div
@@ -273,17 +346,32 @@ function ActionModal({
                             <Trash2 className="h-3.5 w-3.5" /> Zona de peligro
                         </p>
                         <button
-                            onClick={() => { onDelete(company._id, company.name); onClose() }}
+                            onClick={() => setShowDeleteConfirm(true)}
+                            disabled={isDeleting}
                             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-medium
-                                bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors"
+                                bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            <Trash2 className="h-4 w-4" />
-                            Eliminar empresa permanentemente
+                            {isDeleting ? (
+                                <><RefreshCw className="h-4 w-4 animate-spin" /> Eliminando...</>
+                            ) : (
+                                <><Trash2 className="h-4 w-4" /> Eliminar empresa permanentemente</>
+                            )}
                         </button>
                     </div>
                 </div>
             </div>
         </div>
+        <ConfirmDialog
+            open={showDeleteConfirm}
+            title={`¿Eliminar empresa "${company.name}"?`}
+            description="Esta acción es IRREVERSIBLE. Se eliminarán todos los usuarios, productos, ventas y datos de esta empresa."
+            confirmLabel="Sí, eliminar"
+            danger={true}
+            loading={isDeleting}
+            onConfirm={handleDelete}
+            onCancel={() => setShowDeleteConfirm(false)}
+        />
+        </>
     )
 }
 
@@ -307,7 +395,8 @@ function CreateAdminModal({
         createNewCompany: false,
         newCompanyName: "",
         newCompanyEmail: "",
-        businessType: "tienda"
+        businessType: "tienda",
+        createDefaultData: true
     })
     const [isLoading, setIsLoading] = useState(false)
     const [isCreatingCompany, setIsCreatingCompany] = useState(false)
@@ -389,7 +478,8 @@ function CreateAdminModal({
                     email: formData.newCompanyEmail,
                     businessType: formData.businessType,
                     plan: "free",
-                    status: "active"
+                    status: "active",
+                    createDefaultData: formData.createDefaultData
                 })
             })
             
@@ -585,6 +675,19 @@ function CreateAdminModal({
                                 <p className="text-xs text-slate-400">
                                     📋 Se crearán categorías automáticas según el tipo de negocio. La empresa inicia con plan "Gratis".
                                 </p>
+                                
+                                <div className="flex items-center gap-2 p-3 bg-slate-800 rounded-xl border border-slate-700">
+                                    <input 
+                                        type="checkbox"
+                                        id="createDefaultData"
+                                        checked={formData.createDefaultData}
+                                        onChange={(e) => setFormData({ ...formData, createDefaultData: e.target.checked })}
+                                        className="w-4 h-4 rounded border-slate-600 text-violet-600 focus:ring-violet-500 bg-slate-700"
+                                    />
+                                    <label htmlFor="createDefaultData" className="text-sm text-slate-300 cursor-pointer">
+                                        Generar categorías y productos sugeridos
+                                    </label>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -1187,6 +1290,19 @@ export default function SuperAdminPanel() {
     const [selectedCompanyForAdmin, setSelectedCompanyForAdmin] = useState<CompanyData | null>(null)
     const [showEditUsersModal, setShowEditUsersModal] = useState(false)
     const [selectedCompanyForUsers, setSelectedCompanyForUsers] = useState<CompanyData | null>(null)
+    const [confirmDialog, setConfirmDialog] = useState<{
+        open: boolean
+        title: string
+        description: string
+        confirmLabel?: string
+        danger?: boolean
+        loading?: boolean
+        onConfirm: () => void
+    }>({
+        open: false, title: '', description: '', onConfirm: () => {}
+    })
+
+    const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false, loading: false }))
 
     useEffect(() => { fetchData() }, [])
 
@@ -1256,55 +1372,74 @@ export default function SuperAdminPanel() {
     }
 
     const deleteCompany = async (id: string, name: string) => {
-        if (!confirm(`¿Seguro que quieres ELIMINAR la empresa "${name}"?\n\nEsta acción es IRREVERSIBLE y borrará todos sus datos.`)) return
+        // La confirmación ahora se maneja en el modal, así que solo ejecutamos
         const res = await fetch(`/api/super-administrador/empresas/${id}`, { method: "DELETE" })
         if (res.ok) {
-            toast.success("Empresa eliminada")
+            toast.success(`Empresa "${name}" eliminada permanentemente`)
             fetchData()
         } else {
-            toast.error("Error al eliminar")
+            const data = await res.json().catch(() => ({}))
+            toast.error(data.error || "Error al eliminar empresa")
         }
     }
 
     const toggleAdminStatus = async (adminId: string, currentStatus: boolean, adminName: string) => {
         const action = currentStatus ? 'desactivar' : 'activar'
-        if (!confirm(`¿Seguro que quieres ${action} al administrador "${adminName}"?`)) return
-        
-        try {
-            const res = await fetch(`/api/super-administrador/administradores/${adminId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ isActive: !currentStatus })
-            })
-            
-            if (res.ok) {
-                toast.success(`Administrador ${action}do exitosamente`)
-                fetchData()
-            } else {
-                const error = await res.json()
-                toast.error(error.error || "Error al cambiar estado")
+        setConfirmDialog({
+            open: true,
+            title: `¿Seguro que quieres ${action} a "${adminName}"?`,
+            description: `El usuario quedará ${currentStatus ? 'desactivado e imposibilitado de ingresar' : 'activo y podrá ingresar al sistema'}.`,
+            confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
+            danger: currentStatus,
+            onConfirm: async () => {
+                setConfirmDialog(d => ({ ...d, loading: true }))
+                try {
+                    const res = await fetch(`/api/super-administrador/administradores/${adminId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ isActive: !currentStatus })
+                    })
+                    const data = await res.json()
+                    closeConfirm()
+                    if (res.ok) {
+                        toast.success(data.message || `Usuario ${action}do exitosamente`)
+                        fetchData()
+                    } else {
+                        toast.error(data.error || `Error al ${action} usuario`)
+                    }
+                } catch {
+                    closeConfirm()
+                    toast.error("Error de conexión")
+                }
             }
-        } catch (error) {
-            toast.error("Error de conexión")
-        }
+        })
     }
 
     const deleteAdmin = async (adminId: string, adminName: string) => {
-        if (!confirm(`¿Seguro que quieres ELIMINAR al administrador "${adminName}"?\n\nEsta acción es IRREVERSIBLE.`)) return
-        
-        try {
-            const res = await fetch(`/api/super-administrador/administradores/${adminId}`, { method: "DELETE" })
-            
-            if (res.ok) {
-                toast.success("Administrador eliminado exitosamente")
-                fetchData()
-            } else {
-                const error = await res.json()
-                toast.error(error.error || "Error al eliminar")
+        setConfirmDialog({
+            open: true,
+            title: `¿Eliminar usuario "${adminName}"?`,
+            description: "Esta acción es IRREVERSIBLE. El usuario será eliminado del sistema permanentemente.",
+            confirmLabel: "Sí, eliminar",
+            danger: true,
+            onConfirm: async () => {
+                setConfirmDialog(d => ({ ...d, loading: true }))
+                try {
+                    const res = await fetch(`/api/super-administrador/administradores/${adminId}`, { method: "DELETE" })
+                    const data = await res.json()
+                    closeConfirm()
+                    if (res.ok) {
+                        toast.success(data.message || "Usuario eliminado exitosamente")
+                        fetchData()
+                    } else {
+                        toast.error(data.error || "Error al eliminar usuario")
+                    }
+                } catch {
+                    closeConfirm()
+                    toast.error("Error de conexión al eliminar")
+                }
             }
-        } catch (error) {
-            toast.error("Error de conexión")
-        }
+        })
     }
 
     const openEditUsersModal = (company: CompanyData) => {
@@ -1615,6 +1750,18 @@ export default function SuperAdminPanel() {
                     }}
                 />
             )}
+
+            {/* ── Diálogo de confirmación global ── */}
+            <ConfirmDialog
+                open={confirmDialog.open}
+                title={confirmDialog.title}
+                description={confirmDialog.description}
+                confirmLabel={confirmDialog.confirmLabel}
+                danger={confirmDialog.danger}
+                loading={confirmDialog.loading}
+                onConfirm={confirmDialog.onConfirm}
+                onCancel={closeConfirm}
+            />
         </div>
     )
 }

@@ -275,10 +275,41 @@ export default function POSView() {
 
                 const newQuantity = item.quantity + delta
                 if (newQuantity > maxStock) {
-                    toast.error("Stock insuficiente")
+                    toast.error("Stock insuficiente (Máx: " + maxStock + ")")
                     return item
                 }
                 return { ...item, quantity: Math.max(0, newQuantity) }
+            }
+            return item
+        }).filter(item => item.quantity > 0))
+    }
+
+    const setManualQuantity = (cartItemKey: string, value: string) => {
+        const newQty = parseInt(value)
+        if (isNaN(newQty)) {
+            // Manejar borrar para permitir escribir
+            if (value === "") {
+                setCart(cart.map(item => {
+                    const key = (item as any).variantId ? `${item.product._id}-${(item as any).variantId}` : item.product._id
+                    return key === cartItemKey ? { ...item, quantity: 0 } : item
+                }))
+            }
+            return
+        }
+
+        setCart(cart.map(item => {
+            const key = (item as any).variantId ? `${item.product._id}-${(item as any).variantId}` : item.product._id
+            
+            if (key === cartItemKey) {
+                const maxStock = (item as any).variantId 
+                    ? (item.product as any).variants.find((v:any) => v._id === (item as any).variantId)?.stock || item.product.stock
+                    : item.product.stock
+
+                if (newQty > maxStock) {
+                    toast.error(`Stock insuficiente (Máx: ${maxStock})`)
+                    return { ...item, quantity: maxStock }
+                }
+                return { ...item, quantity: Math.max(0, newQty) }
             }
             return item
         }).filter(item => item.quantity > 0))
@@ -664,7 +695,13 @@ export default function POSView() {
                                     </div>
                                     <div className={styles.itemControls}>
                                         <button className={styles.quantityBtn} onClick={() => updateQuantity(key, -1)}><Minus size={16} /></button>
-                                        <span className={styles.quantity}>{item.quantity}</span>
+                                        <input 
+                                            type="number" 
+                                            className={styles.quantityInput} 
+                                            value={item.quantity || ""} 
+                                            onChange={(e) => setManualQuantity(key, e.target.value)}
+                                            min="1"
+                                        />
                                         <button className={styles.quantityBtn} onClick={() => updateQuantity(key, 1)}><Plus size={16} /></button>
                                         <button className={styles.quantityBtn} onClick={() => removeFromCart(key)}><Trash2 size={16} /></button>
                                     </div>

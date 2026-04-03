@@ -91,15 +91,15 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
         const product = await Product.create({
             name,
             sku,
-            category: categoryId, // Mapeado de categoryId a category
-            supplier: supplierId === 'none' ? null : supplierId,
-            purchasePrice: costPrice || 0, // Mapeado de costPrice a purchasePrice
+            category: categoryId, 
+            supplier: (supplierId === 'none' || !supplierId) ? null : supplierId,
+            purchasePrice: costPrice || 0, 
             salePrice,
             stock: stock || 0,
             minStock: minStock || 0,
             description: description || "",
             imageUrl: body.imageUrl || body.image || "",
-            companyId: context.companyId, // <--- REQUERIDO: Inyectar ID de sesión
+            companyId: context.companyId,
         })
 
         // 3. Actualizar contador de productos en el uso del Plan
@@ -113,7 +113,11 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
     } catch (error: any) {
         console.error("Error creating product:", error)
         return NextResponse.json(
-            { error: "Error al crear producto" },
+            { 
+                error: "Error al crear producto", 
+                message: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+            },
             { status: 500 }
         )
     }

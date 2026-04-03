@@ -48,10 +48,14 @@ export default function DashboardView() {
     
     // Obtener datos rápidos con SWR
     const { data: userData } = useSWR("/api/autenticacion/me", fetcher)
-    const { data: stats, isLoading: loadingStats } = useSWR("/api/dashboard", fetcher, { 
-        refreshInterval: 120000, 
-        revalidateOnFocus: true 
-    })
+    const { data: stats, isLoading: loadingStats } = useSWR(
+        userData?.user && userData.user.role !== "superadmin" ? "/api/dashboard" : null, 
+        fetcher, 
+        { 
+            refreshInterval: 120000, 
+            revalidateOnFocus: true 
+        }
+    )
 
     const user = userData?.user
 

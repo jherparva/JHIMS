@@ -23,7 +23,7 @@ export function Sidebar() {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const { data: stats } = useSWR("/api/dashboard", fetcher, { refreshInterval: 60000 })
+  const { data: stats } = useSWR(user && user.role !== "superadmin" ? "/api/dashboard" : null, fetcher, { refreshInterval: 60000 })
   const lowStockCount = stats?.lowStockProducts?.length || 0
 
   useEffect(() => {

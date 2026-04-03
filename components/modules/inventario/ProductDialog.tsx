@@ -141,8 +141,8 @@ export function ProductDialog({ open, onOpenChange, onSuccess, product }: Produc
                 reset()
                 onSuccess()
             } else {
-                const error = await response.json()
-                toast.error(error.error || "Error al guardar producto")
+                const errorData = await response.json()
+                toast.error(`${errorData.error || "Error"}${errorData.message ? ': ' + errorData.message : ''}`)
             }
         } catch (error) {
             toast.error("Error de conexión")

@@ -26,7 +26,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
 
         // 3. Obtener estadísticas de ventas (CORREGIDO: solo de la empresa específica)
         const salesStats = await Sale.aggregate([
-            { $match: { companyId: compId } },
+            { $match: { companyId: compId, status: { $ne: "cancelled" } } },
             {
                 $group: {
                     _id: null,
@@ -52,7 +52,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             .lean()
 
         // 5. Ventas recientes
-        const recentSalesData = await Sale.find({ companyId: compId })
+        const recentSalesData = await Sale.find({ companyId: compId, status: { $ne: "cancelled" } })
             .populate("customer", "name")
             .sort({ createdAt: -1 })
             .limit(5)
@@ -74,6 +74,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             {
                 $match: {
                     companyId: compId,
+                    status: { $ne: "cancelled" },
                     createdAt: { $gte: sevenDaysAgo }
                 }
             },
@@ -108,7 +109,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
         const midnight = new Date()
         midnight.setHours(0, 0, 0, 0)
         const todaySalesAgg = await Sale.aggregate([
-            { $match: { companyId: compId, createdAt: { $gte: midnight } } },
+            { $match: { companyId: compId, status: { $ne: "cancelled" }, createdAt: { $gte: midnight } } },
             { $group: { _id: null, total: { $sum: "$total" } } }
         ])
         const todaySales = todaySalesAgg[0]?.total || 0

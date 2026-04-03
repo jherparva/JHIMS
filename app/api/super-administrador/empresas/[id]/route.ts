@@ -262,6 +262,16 @@ export async function DELETE(
     return runWithSession({ role: 'superadmin', userId: user.id }, async () => {
         try {
             await connectDB()
+
+            console.log(`[SUPERADMIN DELETE COMPANY] Intentando eliminar empresa: ${params.id}`)
+
+            // Verificar que la empresa existe
+            const company = await Company.findById(params.id)
+            if (!company) {
+                return NextResponse.json({ error: "Empresa no encontrada" }, { status: 404 })
+            }
+
+            const companyName = company.name
             
             // Importar modelos para borrado en cascada
             const [UserModel, CategoryModel, ProductModel, CustomerModel, SupplierModel, SaleModel, TicketModel] = await Promise.all([
@@ -274,20 +284,31 @@ export async function DELETE(
                 import("@/lib/db/models/Ticket").then(m => m.default)
             ]);
 
-            // Borrar todos los documentos asociados a esta empresa
-            // Nota: El plugin de multi-tenancy podría bloquear estos deleteMany si no hay contexto
-            await Promise.all([
-                UserModel.deleteMany({ companyId: params.id, role: { $ne: 'superadmin' } }),
-                CategoryModel.deleteMany({ companyId: params.id }),
-                ProductModel.deleteMany({ companyId: params.id }),
-                CustomerModel.deleteMany({ companyId: params.id }),
-                SupplierModel.deleteMany({ companyId: params.id }),
-                SaleModel.deleteMany({ companyId: params.id }),
-                TicketModel.deleteMany({ companyId: params.id }),
-                Company.findByIdAndDelete(params.id)
+            // Borrar todos los documentos asociados a esta empresa con skipTenantFilter
+            const deleteOpts = { skipTenantFilter: true }
+            const results = await Promise.allSettled([
+                UserModel.deleteMany({ companyId: params.id, role: { $ne: 'superadmin' } }, deleteOpts as any),
+                CategoryModel.deleteMany({ companyId: params.id }, deleteOpts as any),
+                ProductModel.deleteMany({ companyId: params.id }, deleteOpts as any),
+                CustomerModel.deleteMany({ companyId: params.id }, deleteOpts as any),
+                SupplierModel.deleteMany({ companyId: params.id }, deleteOpts as any),
+                SaleModel.deleteMany({ companyId: params.id }, deleteOpts as any),
+                TicketModel.deleteMany({ companyId: params.id }, deleteOpts as any),
             ]);
+
+            // Reportar errores parciales pero continuar
+            results.forEach((r, i) => {
+                if (r.status === 'rejected') {
+                    console.error(`[SUPERADMIN DELETE COMPANY] Error borrando colección ${i}:`, r.reason)
+                }
+            })
+
+            // Borrar la empresa misma
+            await Company.findByIdAndDelete(params.id)
+
+            console.log(`[SUPERADMIN DELETE COMPANY] Empresa "${companyName}" eliminada exitosamente`)
             
-            return NextResponse.json({ success: true })
+            return NextResponse.json({ success: true, message: `Empresa "${companyName}" eliminada exitosamente` })
         } catch (error: any) {
             console.error("DELETE COMPANY ERROR:", error)
             return NextResponse.json({ error: "Error al eliminar empresa: " + error.message }, { status: 500 })

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from 'next/link'
 import styles from './sales.module.css'
-import { Plus, Search, FileText, Printer, CheckCircle2 } from 'lucide-react'
+import { Plus, Search, FileText, Printer, CheckCircle2, RefreshCw, XCircle } from 'lucide-react'
 import { 
     Dialog, 
     DialogContent, 
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { useDebounce } from "@/hooks/useDebounce"
 import { Calendar } from "lucide-react"
+import { toast } from "sonner"
 
 interface ISale {
     _id: string
@@ -20,6 +21,7 @@ interface ISale {
     paymentMethod: string
     date: string
     createdAt: string
+    status?: "completed" | "cancelled"
     items: any[]
 }
 
@@ -83,6 +85,7 @@ export default function SalesView() {
 
     // Primero procesamos todas para las estadísticas de "Hoy"
     sales.forEach(sale => {
+        if (sale.status === "cancelled") return
         const saleDateStr = getLocalDateString(new Date(sale.createdAt || sale.date))
         if (saleDateStr === todayStr) {
             salesTodayTotal += sale.total
@@ -105,8 +108,9 @@ export default function SalesView() {
         return true
     })
 
-    const totalPeriod = filteredSales.reduce((acc, curr) => acc + curr.total, 0)
-    const countPeriod = filteredSales.length
+    const validFilteredSales = filteredSales.filter(s => s.status !== "cancelled")
+    const totalPeriod = validFilteredSales.reduce((acc, curr) => acc + curr.total, 0)
+    const countPeriod = validFilteredSales.length
 
     const averageToday = ordersToday > 0 ? (salesTodayTotal / ordersToday) : 0
 
@@ -134,6 +138,26 @@ export default function SalesView() {
             case 'card': return 'Tarjeta'
             case 'transfer': return 'Transferencia'
             default: return method
+        }
+    }
+
+    const handleCancelSale = async (id: string) => {
+        if (!confirm("¿Seguro que deseas cancelar esta venta? El stock será restaurado automáticamente y la venta dejará de sumar en los reportes.")) {
+            return
+        }
+
+        try {
+            const res = await fetch(`/api/ventas/${id}`, { method: 'DELETE' })
+            if (res.ok) {
+                toast.success("Venta cancelada y stock restaurado")
+                fetchSales()
+                setSelectedSale(null)
+            } else {
+                const error = await res.json()
+                toast.error(error.error || "Error al cancelar venta")
+            }
+        } catch {
+            toast.error("Error de conexión")
         }
     }
 
@@ -374,9 +398,16 @@ export default function SalesView() {
                                             {sale.items?.length || 0} items
                                         </td>
                                         <td className="p-4 font-semibold text-gray-900">
-                                            {formatCurrency(sale.total)}
+                                            <div className="flex flex-col">
+                                                <span className={sale.status === "cancelled" ? "line-through text-gray-400" : ""}>
+                                                    {formatCurrency(sale.total)}
+                                                </span>
+                                                {sale.status === "cancelled" && (
+                                                    <span className="text-[10px] text-rose-500 font-bold uppercase">Anulada</span>
+                                                )}
+                                            </div>
                                         </td>
-                                        <td className="p-4 flex justify-center">
+                                        <td className="p-4 flex justify-center gap-2">
                                             <button 
                                                 onClick={() => setSelectedSale(sale)}
                                                 className="text-gray-400 hover:text-primary transition-colors p-1" 
@@ -384,6 +415,15 @@ export default function SalesView() {
                                             >
                                                 <FileText size={18} />
                                             </button>
+                                            {sale.status !== "cancelled" && (
+                                                <button 
+                                                    onClick={() => handleCancelSale(sale._id)}
+                                                    className="text-gray-300 hover:text-rose-500 transition-colors p-1" 
+                                                    title="Anular Venta / Devolución"
+                                                >
+                                                    <RefreshCw size={18} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -401,7 +441,15 @@ export default function SalesView() {
                                     <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
                                             <div className="print:hidden flex items-center gap-2 text-emerald-600 font-bold">
-                                                <CheckCircle2 className="h-5 w-5" /> ¡Venta Exitosa!
+                                                {selectedSale?.status === "cancelled" ? (
+                                                    <div className="flex items-center gap-2 text-rose-500">
+                                                        <XCircle className="h-5 w-5" /> Venta Anulada
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle2 className="h-5 w-5" /> ¡Venta Exitosa!
+                                                    </div>
+                                                )}
                                             </div>
                                             <span className="print:hidden text-black font-bold hidden [:not(.text-emerald-600)>&]:inline">Detalle de Venta #{selectedSale?._id.slice(-6).toUpperCase()}</span>
                                             <span className="hidden print:block text-4xl font-black uppercase text-black tracking-tighter">{companyInfo?.name || 'LA TIENDA DE LUCHO'}</span>
@@ -457,7 +505,17 @@ export default function SalesView() {
                                 </table>
                             </div>
 
-                            <div className="mt-8 flex flex-col sm:flex-row gap-3 print:hidden">
+                            <div className="mt-8 flex flex-wrap sm:flex-nowrap gap-3 print:hidden">
+                                {selectedSale.status !== "cancelled" && (
+                                    <Button 
+                                        variant="destructive" 
+                                        className="w-full sm:w-auto h-12 rounded-xl font-bold gap-2 px-6"
+                                        onClick={() => handleCancelSale(selectedSale._id)}
+                                    >
+                                        <RefreshCw className="h-5 w-5" />
+                                        Anular Venta
+                                    </Button>
+                                )}
                                 <Button 
                                     variant="outline" 
                                     className="flex-1 h-12 rounded-xl font-bold gap-2 border-gray-300"

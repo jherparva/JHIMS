@@ -78,15 +78,15 @@ export const PUT = withSessionContext(async (
             {
                 name,
                 sku,
-                category: categoryId || null,
-                supplier: supplierId || null,
+                category: categoryId || undefined,
+                supplier: (supplierId === 'none' || !supplierId) ? null : supplierId,
                 purchasePrice: costPrice || 0,
                 salePrice,
                 stock: stock || 0,
                 minStock: minStock || 0,
                 description,
-                imageUrl: imageUrl || null,
-                hasVariants,
+                imageUrl: imageUrl || "",
+                hasVariants: hasVariants || false,
                 variants: variants || []
             },
             { new: true, runValidators: true }
@@ -103,7 +103,10 @@ export const PUT = withSessionContext(async (
     } catch (error: any) {
         console.error("Error updating product:", error)
         return NextResponse.json(
-            { error: "Error al actualizar producto" },
+            { 
+                error: "Error al actualizar producto",
+                message: error.message 
+            },
             { status: 500 }
         )
     }

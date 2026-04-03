@@ -151,95 +151,93 @@ export async function POST(req: NextRequest) {
         )
     }
 
-    try {
-        await connectDB()
+    const { runWithSession } = await import("@/lib/session-context")
 
-        const body = await req.json()
-        const { companyId, fullName, username, email, password, permissions = [] } = body
+    return runWithSession({ role: 'superadmin', userId: superadmin.id }, async () => {
+        try {
+            await connectDB()
 
-        if (!companyId || !fullName || !username || !email || !password) {
-            return NextResponse.json(
-                { error: "Todos los campos son requeridos" },
-                { status: 400 }
-            )
+            const body = await req.json()
+            const { companyId, fullName, username, email, password, permissions = [] } = body
+
+            if (!companyId || !fullName || !username || !email || !password) {
+                return NextResponse.json(
+                    { error: "Todos los campos son requeridos" },
+                    { status: 400 }
+                )
+            }
+
+            if (password.length < 6) {
+                return NextResponse.json(
+                    { error: "La contraseña debe tener al menos 6 caracteres" },
+                    { status: 400 }
+                )
+            }
+
+            // Verificar si la empresa existe
+            const Company = (await import("@/lib/db/models/Company")).default
+            const company = await Company.findById(companyId)
+            if (!company) {
+                return NextResponse.json(
+                    { error: "Empresa no encontrada" },
+                    { status: 404 }
+                )
+            }
+
+            // Verificar límites del plan - El superadmin puede ignorar estos límites
+            // pero igualmente informamos cuántos slots quedan
+            const { PLANS } = await import("@/lib/db/models/Company")
+            const planConfig = PLANS[company.plan]
+            const maxUsers = planConfig?.limits?.maxUsers ?? 10
+
+            // Contar usuarios existentes
+            const currentSellerCount = await User.countDocuments({
+                companyId,
+                role: "seller",
+                isActive: true
+            }).setOptions({ skipTenantFilter: true })
+
+            // Verificar si el usuario ya existe en todo el sistema
+            const existingUser = await User.findOne({
+                $or: [{ username }, { email }]
+            }).setOptions({ skipTenantFilter: true })
+
+            if (existingUser) {
+                return NextResponse.json(
+                    { error: `El usuario o email ya existe (${existingUser.username === username ? 'usuario' : 'email'} duplicado)` },
+                    { status: 400 }
+                )
+            }
+
+            // Crear el vendedor (el hasheo lo maneja el pre-save hook de User)
+            const seller = await User.create({
+                fullName,
+                username: username.toLowerCase().trim(),
+                email: email.toLowerCase().trim(),
+                password,
+                role: "seller",
+                companyId,
+                isActive: true,
+                permissions
+            })
+
+            const sellerResponse = seller.toObject()
+            delete (sellerResponse as any).password
+
+            return NextResponse.json({
+                message: "Vendedor creado exitosamente",
+                seller: sellerResponse,
+                remainingSlots: Math.max(0, maxUsers - currentSellerCount - 1)
+            }, { status: 201 })
+
+        } catch (error: any) {
+            console.error("SUPERADMIN CREATE SELLER ERROR:", error)
+            // Mostrar el error real de Mongoose (ej: validación de contraseña)
+            const msg = error.errors
+                ? Object.values(error.errors).map((e: any) => e.message).join(', ')
+                : error.message || "Error al crear vendedor"
+            return NextResponse.json({ error: msg }, { status: 500 })
         }
-
-        // Verificar si la empresa existe
-        const Company = (await import("@/lib/db/models/Company")).default
-        const company = await Company.findById(companyId)
-        if (!company) {
-            return NextResponse.json(
-                { error: "Empresa no encontrada" },
-                { status: 404 }
-            )
-        }
-
-        // Verificar límites del plan
-        const { PLANS } = await import("@/lib/db/models/Company")
-        const planConfig = PLANS[company.plan]
-        const maxUsers = planConfig.limits.maxUsers
-
-        // Contar usuarios actuales de la empresa (admin + vendedores)
-        const currentUsers = await User.countDocuments({ 
-            companyId, 
-            role: { $in: ["admin", "seller"] }, 
-            isActive: true 
-        })
-
-        // Para plan gratis: 1 admin + (maxUsers - 1) vendedores
-        // Para otros planes: maxUsers totales (admin + vendedores)
-        const maxSellers = company.plan === 'free' ? (maxUsers - 1) : (maxUsers - 1) // Dejar 1 para admin
-        const currentSellers = await User.countDocuments({ 
-            companyId, 
-            role: "seller", 
-            isActive: true 
-        })
-
-        if (currentSellers >= maxSellers) {
-            return NextResponse.json(
-                { error: `Límite de vendedores alcanzado. Plan ${company.plan} permite máximo ${maxSellers} vendedores.` },
-                { status: 400 }
-            )
-        }
-
-        // Verificar si el usuario ya existe
-        const existingUser = await User.findOne({
-            $or: [{ username }, { email }]
-        })
-
-        if (existingUser) {
-            return NextResponse.json(
-                { error: "El usuario o email ya existe" },
-                { status: 400 }
-            )
-        }
-
-        // Crear el vendedor
-        const seller = await User.create({
-            fullName,
-            username,
-            email,
-            password, // El hasheo se encarga el pre-save hook del modelo User.ts
-            role: "seller",
-            companyId,
-            isActive: true,
-            permissions
-        })
-
-        const sellerResponse = seller.toObject()
-        delete sellerResponse.password
-
-        return NextResponse.json({
-            message: "Vendedor creado exitosamente",
-            seller: sellerResponse,
-            remainingSlots: maxSellers - (currentSellers + 1)
-        }, { status: 201 })
-
-    } catch (error: any) {
-        console.error("SUPERADMIN CREATE SELLER ERROR:", error)
-        return NextResponse.json(
-            { error: "Error al crear vendedor" },
-            { status: 500 }
-        )
-    }
+    })
 }
+

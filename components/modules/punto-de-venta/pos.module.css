@@ -207,6 +207,23 @@
     text-align: center;
 }
 
+.quantityInput {
+    width: 48px;
+    height: 32px;
+    border-radius: 0.25rem;
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.875rem;
+    background: white;
+}
+
+.quantityInput:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
 .cartFooter {
     padding: 1rem;
     border-top: 1px solid #e5e7eb;

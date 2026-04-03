@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
         try {
             await connectDB()
             const body = await req.json()
-            const { name, email, phone, plan = "free", status = "pending", businessType = "tienda" } = body
+            const { name, email, phone, plan = "free", status = "pending", businessType = "tienda", createDefaultData = true } = body
 
             // Validaciones básicas
             if (!name || !email) {
@@ -277,48 +277,58 @@ export async function POST(req: NextRequest) {
                 approvedAt: new Date()
             })
 
-            // CREACIÓN AUTOMÁTICA DE CATEGORÍAS
-            const defaultCats = DEFAULT_CATEGORIES[businessType] || DEFAULT_CATEGORIES.tienda
-            const createdCats = await Category.insertMany(
-                defaultCats.map(catName => ({
-                    companyId: company._id,
-                    name: catName,
-                    description: `Generado automáticamente - ${businessType}`,
-                    isActive: true
-                }))
-            )
+            // CREACIÓN AUTOMÁTICA DE CATEGORÍAS (OPCIONAL)
+            if (createDefaultData) {
+                const defaultCats = DEFAULT_CATEGORIES[businessType] || DEFAULT_CATEGORIES.tienda
+                const createdCats = await Category.insertMany(
+                    defaultCats.map(catName => ({
+                        companyId: company._id,
+                        name: catName,
+                        description: `Generado automáticamente - ${businessType}`,
+                        isActive: true
+                    }))
+                )
 
-            // Mapear los _ids de las categorías creadas
-            const catMap = createdCats.reduce((acc, cat) => {
-                acc[cat.name] = cat._id
-                return acc
-            }, {} as Record<string, any>)
+                // Mapear los _ids de las categorías creadas
+                const catMap = createdCats.reduce((acc, cat) => {
+                    acc[cat.name] = cat._id
+                    return acc
+                }, {} as Record<string, any>)
 
-            // CREACIÓN AUTOMÁTICA DE PRODUCTOS
-            const defaultProds = DEFAULT_PRODUCTS[businessType] || DEFAULT_PRODUCTS.tienda
-            
-            let skuCounter = 1;
-            const productsToInsert = defaultProds.map((prod:any) => {
-                const catId = catMap[prod.cat] || createdCats[0]?._id 
-                const paddedSku = skuCounter.toString().padStart(4, '0')
-                skuCounter++
+                // CREACIÓN AUTOMÁTICA DE PRODUCTOS
+                const defaultProds = DEFAULT_PRODUCTS[businessType] || DEFAULT_PRODUCTS.tienda
                 
-                return {
-                    companyId: company._id,
-                    name: prod.name,
-                    description: `Generado automáticamente - ${businessType}`,
-                    sku: `SKU-${businessType.substring(0,3).toUpperCase()}-${paddedSku}`,
-                    category: catId,
-                    purchasePrice: 0,
-                    salePrice: 0,
-                    stock: 0,
-                    minStock: 5,
-                    isActive: true
+                let skuCounter = 1;
+                const productsToInsert = defaultProds.map((prod:any) => {
+                    const catId = catMap[prod.cat] || createdCats[0]?._id 
+                    const paddedSku = skuCounter.toString().padStart(4, '0')
+                    skuCounter++
+                    
+                    return {
+                        companyId: company._id,
+                        name: prod.name,
+                        description: `Generado automáticamente - ${businessType}`,
+                        sku: `SKU-${businessType.substring(0,3).toUpperCase()}-${paddedSku}`,
+                        category: catId,
+                        purchasePrice: 0,
+                        salePrice: 0,
+                        stock: 0,
+                        minStock: 5,
+                        isActive: true
+                    }
+                })
+                
+                if (productsToInsert.length > 0) {
+                    await Product.insertMany(productsToInsert)
                 }
-            })
-            
-            if (productsToInsert.length > 0) {
-                await Product.insertMany(productsToInsert)
+            } else {
+                // Crear SOLO la categoría 'General' para evitar errores funcionales mínimos
+                await Category.create({
+                    companyId: company._id,
+                    name: "General",
+                    description: "Categoría básica para empezar",
+                    isActive: true
+                })
             }
 
             return NextResponse.json({

@@ -35,6 +35,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             { 
                 $match: { 
                     $or: [{ companyId: compId }, { companyId: context.companyId }],
+                    status: { $ne: "cancelled" },
                     createdAt: { $gte: startDate, $lte: endDate } 
                 } 
             },
@@ -71,6 +72,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             { 
                 $match: { 
                     $or: [{ companyId: compId }, { companyId: context.companyId }],
+                    status: { $ne: "cancelled" },
                     createdAt: { $gte: startDate, $lte: endDate } 
                 } 
             },
@@ -137,6 +139,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             { 
                 $match: { 
                     $or: [{ companyId: compId }, { companyId: context.companyId }],
+                    status: { $ne: "cancelled" },
                     createdAt: { $gte: startDate, $lte: endDate } 
                 } 
             },
@@ -173,6 +176,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
             {
                 $match: {
                     $or: [{ companyId: compId }, { companyId: context.companyId }],
+                    status: { $ne: "cancelled" },
                     createdAt: { $gte: startDate, $lte: endDate }
                 }
             },
@@ -199,6 +203,7 @@ export const GET = withSessionContext(async (req: NextRequest, context: any) => 
         // 6. Transacciones Individuales (El Detalle Máximo)
         const rawSales = await Sale.find({
             $or: [{ companyId: compId }, { companyId: context.companyId }],
+            status: { $ne: "cancelled" },
             createdAt: { $gte: startDate, $lte: endDate }
         })
         .populate('customer', 'name taxId')

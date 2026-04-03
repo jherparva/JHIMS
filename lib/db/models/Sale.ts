@@ -24,6 +24,7 @@ export interface ISale extends Document {
     amountPaid: number
     balance: number
     paymentStatus: "paid" | "partial" | "pending"
+    status: "completed" | "cancelled"
     payments: IPayment[]
     date: Date
     companyId?: mongoose.Types.ObjectId
@@ -63,6 +64,11 @@ const SaleSchema = new Schema<ISale>(
             type: String,
             enum: ["paid", "partial", "pending"],
             default: "paid"
+        },
+        status: {
+            type: String,
+            enum: ["completed", "cancelled"],
+            default: "completed"
         },
         payments: [PaymentSchema],
         date: { type: Date, default: Date.now },
