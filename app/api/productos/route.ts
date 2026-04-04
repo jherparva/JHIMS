@@ -102,7 +102,22 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             companyId: context.companyId,
         })
 
-        // 3. Actualizar contador de productos en el uso del Plan
+        // 3. REGISTRAR EN KARDEX SI HAY STOCK INICIAL
+        if (product.stock > 0) {
+            const { default: Kardex } = await import("@/lib/db/models/Kardex")
+            await Kardex.create({
+                companyId: context.companyId,
+                productId: product._id,
+                type: "in",
+                quantity: product.stock,
+                balanceAfter: product.stock,
+                reason: "Stock Inicial (Creación)",
+                referenceTicket: "Manual",
+                date: new Date()
+            })
+        }
+
+        // 4. Actualizar contador de productos en el uso del Plan
         try {
             await (Company as any).incrementUsage(context.companyId, 'products')
         } catch (usageErr) {

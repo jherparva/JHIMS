@@ -3,6 +3,7 @@ import {
     ShoppingCart,
     Package,
     Truck,
+    Wallet,
     Users,
     BarChart3,
     Settings,
@@ -46,6 +47,20 @@ export const MENU_ITEMS: MenuItem[] = [
         icon: ShoppingBag,
         description: "Listado e historial de ventas",
         color: "from-teal-400 to-teal-600"
+    },
+    {
+        title: "Gastos",
+        href: "/gastos",
+        icon: Wallet,
+        description: "Control de gastos y salidas de caja",
+        color: "from-rose-500 to-red-600"
+    },
+    {
+        title: "Cartera",
+        href: "/cartera",
+        icon: Users,
+        description: "Cuentas por cobrar y abonos",
+        color: "from-indigo-600 to-blue-700"
     },
     // ── Solo ADMIN ─────────────────────────────────────────────────────
     {

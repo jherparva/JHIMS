@@ -20,7 +20,7 @@ export interface ISale extends Document {
     customer?: mongoose.Types.ObjectId
     items: ISaleItem[]
     total: number
-    paymentMethod: "cash" | "card" | "transfer"
+    paymentMethod: "cash" | "card" | "transfer" | "credit"
     amountPaid: number
     balance: number
     paymentStatus: "paid" | "partial" | "pending"
@@ -55,7 +55,7 @@ const SaleSchema = new Schema<ISale>(
         total: { type: Number, required: true, min: 0 },
         paymentMethod: {
             type: String,
-            enum: ["cash", "card", "transfer"],
+            enum: ["cash", "card", "transfer", "credit"],
             default: "cash"
         },
         amountPaid: { type: Number, default: 0 },

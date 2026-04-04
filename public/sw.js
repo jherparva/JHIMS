@@ -8,11 +8,17 @@ const STATIC_ASSETS = [
   "/punto-de-venta",
   "/inicio-sesion",
   "/dashboard",
-  "/productos",
+  "/inventario",
   "/ventas",
+  "/gastos",
+  "/cartera",
   "/categorias",
+  "/entrada-inventario",
   "/proveedores",
+  "/clientes",
   "/usuarios",
+  "/reportes",
+  "/configuracion",
   "/jhims-logo.png",
   "/manifest.json"
 ]

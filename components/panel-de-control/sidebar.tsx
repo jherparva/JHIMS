@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MENU_ITEMS } from "@/lib/menu-config"
-import { LogOut, AlertTriangle, Bell } from "lucide-react"
+import { LogOut, AlertTriangle, Bell, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 import { Logo } from "@/components/logo"
 import useSWR from "swr"
@@ -22,6 +22,8 @@ export function Sidebar() {
   const router = useRouter()
   const [user, setUser] = useState<SessionUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
 
   const { data: stats } = useSWR(user && user.role !== "superadmin" ? "/api/dashboard" : null, fetcher, { refreshInterval: 60000 })
   const lowStockCount = stats?.lowStockProducts?.length || 0
@@ -57,7 +59,8 @@ export function Sidebar() {
     return true
   })
 
-  const handleLogout = async () => {
+  const executeLogout = async () => {
+    setIsLoggingOut(true)
     try {
       const response = await fetch("/api/autenticacion/logout", { method: "POST" })
       if (response.ok) {
@@ -66,6 +69,39 @@ export function Sidebar() {
       }
     } catch (error) {
       toast.error("Error al cerrar sesión")
+    } finally {
+      setIsLoggingOut(false)
+      setShowLogoutConfirm(false)
+    }
+  }
+
+  const handleGoToCloseBox = () => {
+    setShowLogoutConfirm(false)
+    localStorage.setItem('jhims_logout_after_close', 'true')
+    router.push('/punto-de-venta?action=arqueo')
+  }
+
+  const handleLogout = async () => {
+    try {
+      // Check for active POS session
+      try {
+        const sessionRes = await fetch("/api/caja/session");
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData && sessionData.activeSession && sessionData.activeSession._id) {
+            setShowLogoutConfirm(true) // Show custom visual modal
+            return;
+          }
+        }
+      } catch (e) {
+        // Ignorar si hay error de red o no existe la ruta, procedemos al logout
+      }
+      
+      // Si no hubo caja abierta, cerrar sesión de inmediato
+      executeLogout();
+
+    } catch (error) {
+      toast.error("Error al procesar el cierre de sesión")
     }
   }
 
@@ -141,6 +177,58 @@ export function Sidebar() {
           Cerrar sesión
         </Button>
       </div>
+
+      {/* --- MODAL DE ADVERTENCIA AL CERRAR SESIÓN CON CAJA ABIERTA --- */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !isLoggingOut && setShowLogoutConfirm(false)} />
+            <div className="relative bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl w-full max-w-sm p-6 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-rose-500" />
+                
+                <div className="flex flex-col items-center text-center space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 shadow-[0_0_20px_1px_rgba(245,158,11,0.2)]">
+                        <AlertTriangle className="h-8 w-8" />
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <h3 className="font-black text-white text-xl tracking-tight">¡Tienes una Caja Abierta!</h3>
+                        <p className="text-slate-400 text-sm leading-relaxed px-2">
+                            Aún no has hecho el cuadre ni el cierre de la caja. ¿Estás absolutamente seguro de que quieres abandonar la sesión?
+                        </p>
+                    </div>
+                </div>
+                
+                <div className="flex flex-col gap-2 pt-6 mt-2">
+                    <button
+                        onClick={handleGoToCloseBox}
+                        disabled={isLoggingOut}
+                        className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 border border-emerald-500 border-b-2 border-b-emerald-700 text-white rounded-2xl text-sm font-black tracking-wide flex justify-center items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Ir a Cierre de Caja rápido
+                    </button>
+                    
+                    <div className="flex gap-2 w-full mt-1">
+                        <button
+                            onClick={() => setShowLogoutConfirm(false)}
+                            disabled={isLoggingOut}
+                            className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 border-b-2 border-b-slate-900 text-white rounded-2xl text-sm font-bold transition-all disabled:opacity-50"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={executeLogout}
+                            disabled={isLoggingOut}
+                            className="flex-1 px-4 py-3 bg-rose-600 hover:bg-rose-500 border border-rose-500 border-b-2 border-b-rose-700 text-white rounded-2xl text-sm font-black tracking-wide flex justify-center items-center gap-2 transition-all disabled:opacity-50"
+                        >
+                            {isLoggingOut ? <RefreshCw className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                            Forzar Salida
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   )
 }

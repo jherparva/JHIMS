@@ -137,6 +137,7 @@ export default function SalesView() {
             case 'cash': return 'Efectivo'
             case 'card': return 'Tarjeta'
             case 'transfer': return 'Transferencia'
+            case 'credit': return 'A Crédito (Deuda)'
             default: return method
         }
     }
@@ -158,6 +159,26 @@ export default function SalesView() {
             }
         } catch {
             toast.error("Error de conexión")
+        }
+    }
+
+    const handleRestoreSale = async (id: string) => {
+        if (!confirm("¿Deseas restaurar esta venta? Se descontará nuevamente el stock y volverá a sumar en tus reportes.")) {
+            return
+        }
+
+        try {
+            const res = await fetch(`/api/ventas/${id}/restore`, { method: 'POST' })
+            if (res.ok) {
+                toast.success("Venta restaurada correctamente")
+                fetchSales()
+                setSelectedSale(null)
+            } else {
+                const error = await res.json()
+                toast.error(error.error || "Error al restaurar venta")
+            }
+        } catch {
+            toast.error("Error de conexión al restaurar")
         }
     }
 
@@ -415,11 +436,19 @@ export default function SalesView() {
                                             >
                                                 <FileText size={18} />
                                             </button>
-                                            {sale.status !== "cancelled" && (
+                                            {sale.status !== "cancelled" ? (
                                                 <button 
                                                     onClick={() => handleCancelSale(sale._id)}
                                                     className="text-gray-300 hover:text-rose-500 transition-colors p-1" 
                                                     title="Anular Venta / Devolución"
+                                                >
+                                                    <RefreshCw size={18} />
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={() => handleRestoreSale(sale._id)}
+                                                    className="text-emerald-300 hover:text-emerald-500 transition-colors p-1" 
+                                                    title="Deshacer Anulación (Restaurar)"
                                                 >
                                                     <RefreshCw size={18} />
                                                 </button>
@@ -433,11 +462,10 @@ export default function SalesView() {
                 </div>
             </div>
 
-            {/* Modal de Detalles de Venta */}
             <Dialog open={!!selectedSale} onOpenChange={() => setSelectedSale(null)}>
-                <DialogContent className="max-w-2xl bg-white print:max-w-none print:w-full print:border-0 print:shadow-none print:p-0 print:m-0 print:static print:transform-none !print:bg-white">
+                <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white px-4 py-6">
                     <DialogHeader className="print:block print:mb-6">
-                                <DialogTitle className="flex justify-between items-start gap-4 border-b pb-6 print:border-b-2 print:border-black">
+                                <DialogTitle className="flex flex-col sm:flex-row justify-between items-start gap-3 border-b pb-3 print:border-b-2 print:border-black">
                                     <div className="flex flex-col gap-1">
                                         <div className="flex items-center gap-2">
                                             <div className="print:hidden flex items-center gap-2 text-emerald-600 font-bold">
@@ -451,7 +479,7 @@ export default function SalesView() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <span className="print:hidden text-black font-bold hidden [:not(.text-emerald-600)>&]:inline">Detalle de Venta #{selectedSale?._id.slice(-6).toUpperCase()}</span>
+                                            <span className="print:hidden text-black font-bold hidden [:not(.text-emerald-600)>&]:inline text-sm sm:text-base">Detalle de Venta #{selectedSale?._id.slice(-6).toUpperCase()}</span>
                                             <span className="hidden print:block text-4xl font-black uppercase text-black tracking-tighter">{companyInfo?.name || 'LA TIENDA DE LUCHO'}</span>
                                         </div>
                                         <span className="hidden print:block text-sm font-bold text-gray-700">NIT: {companyInfo?.taxId || 'N/A'}</span>
@@ -464,49 +492,49 @@ export default function SalesView() {
                     </DialogHeader>
 
                     {selectedSale && (
-                        <div className="py-4 print-content-wrapper flex flex-col h-full">
-                            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-                                <div className="bg-gray-50 p-3 rounded-lg border">
+                        <div className="py-2 print-content-wrapper flex flex-col h-full">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
+                                <div className="bg-gray-50 p-2 rounded-lg border">
                                     <p className="text-gray-500 font-bold uppercase text-[10px] mb-1">Información General</p>
                                     <div className="space-y-1">
                                         <p><strong>Fecha:</strong> {formatDate(selectedSale.createdAt || selectedSale.date)}</p>
                                         <p><strong>Método:</strong> {translatePaymentMethod(selectedSale.paymentMethod)}</p>
                                     </div>
                                 </div>
-                                <div className="bg-primary/5 p-3 rounded-lg border border-primary/10 text-right">
-                                    <p className="text-primary font-bold uppercase text-[10px] mb-1">Total Venta</p>
-                                    <p className="text-2xl font-black text-primary">{formatCurrency(selectedSale.total)}</p>
+                                <div className="bg-primary/5 p-2 rounded-lg border border-primary/10 text-right flex flex-col justify-center">
+                                    <p className="text-primary font-bold uppercase text-[9px] mb-1">Total Venta</p>
+                                    <p className="text-lg sm:text-xl font-black text-primary leading-none">{formatCurrency(selectedSale.total)}</p>
                                 </div>
                             </div>
 
-                            <div className="border rounded-xl overflow-hidden shadow-sm">
+                            <div className="border rounded-xl overflow-x-auto shadow-sm">
                                 <table className="w-full text-sm">
                                     <thead className="bg-gray-50 border-b">
                                         <tr>
-                                            <th className="p-3 text-left font-bold">Producto</th>
-                                            <th className="p-3 text-center font-bold">Cant.</th>
-                                            <th className="p-3 text-right font-bold">Precio</th>
-                                            <th className="p-3 text-right font-bold">Subtotal</th>
+                                            <th className="p-2 text-left font-bold">Producto</th>
+                                            <th className="p-2 text-center font-bold">Cant.</th>
+                                            <th className="p-2 text-right font-bold">Precio</th>
+                                            <th className="p-2 text-right font-bold">Subtotal</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {selectedSale.items?.map((item: any, idx: number) => (
                                             <tr key={idx} className="border-b last:border-0 hover:bg-gray-50/50">
-                                                <td className="p-3">
+                                                <td className="p-2">
                                                     <p className="font-bold text-gray-800">{item.product?.name || 'Producto eliminado'}</p>
                                                     <p className="text-[10px] text-gray-500 font-mono">{item.product?.sku}</p>
                                                 </td>
-                                                <td className="p-3 text-center font-medium">{item.quantity}</td>
-                                                <td className="p-3 text-right text-gray-600">{formatCurrency(item.price)}</td>
-                                                <td className="p-3 text-right font-bold text-gray-900">{formatCurrency(item.subtotal)}</td>
+                                                <td className="p-2 text-center font-medium">{item.quantity}</td>
+                                                <td className="p-2 text-right text-gray-600">{formatCurrency(item.price)}</td>
+                                                <td className="p-2 text-right font-bold text-gray-900">{formatCurrency(item.subtotal)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
 
-                            <div className="mt-8 flex flex-wrap sm:flex-nowrap gap-3 print:hidden">
-                                {selectedSale.status !== "cancelled" && (
+                            <div className="mt-4 flex flex-col sm:grid sm:grid-cols-2 lg:flex lg:flex-row gap-2 print:hidden">
+                                {selectedSale.status !== "cancelled" ? (
                                     <Button 
                                         variant="destructive" 
                                         className="w-full sm:w-auto h-12 rounded-xl font-bold gap-2 px-6"
@@ -514,6 +542,14 @@ export default function SalesView() {
                                     >
                                         <RefreshCw className="h-5 w-5" />
                                         Anular Venta
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        className="w-full sm:w-auto h-12 rounded-xl font-bold gap-2 px-6 bg-emerald-600 hover:bg-emerald-700"
+                                        onClick={() => handleRestoreSale(selectedSale._id)}
+                                    >
+                                        <RefreshCw className="h-5 w-5" />
+                                        Deshacer Anulación
                                     </Button>
                                 )}
                                 <Button 

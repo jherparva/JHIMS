@@ -34,7 +34,7 @@ export const GET = withSessionContext(async (
 
 export const PUT = withSessionContext(async (
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params, companyId }: { params: { id: string }, companyId: string }
 ) => {
     try {
         await connectDB()
@@ -73,6 +73,11 @@ export const PUT = withSessionContext(async (
             }
         }
 
+        const oldProduct = await Product.findById(params.id)
+        if (!oldProduct) {
+            return NextResponse.json({ error: "Producto no encontrado" }, { status: 404 })
+        }
+
         const product = await Product.findByIdAndUpdate(
             params.id,
             {
@@ -92,11 +97,20 @@ export const PUT = withSessionContext(async (
             { new: true, runValidators: true }
         )
 
-        if (!product) {
-            return NextResponse.json(
-                { error: "Producto no encontrado" },
-                { status: 404 }
-            )
+        // REGISTRAR EN KARDEX SI HUBO CAMBIO DE STOCK
+        if (oldProduct.stock !== (stock || 0)) {
+            const { default: Kardex } = await import("@/lib/db/models/Kardex")
+            const diff = (stock || 0) - oldProduct.stock
+            await Kardex.create({
+                companyId: companyId as any,
+                productId: product._id,
+                type: diff > 0 ? "in" : "adjustment",
+                quantity: diff,
+                balanceAfter: stock || 0,
+                reason: "Ajuste Manual / Ingreso Rápido",
+                referenceTicket: "Manual",
+                date: new Date()
+            })
         }
 
         return NextResponse.json(product)

@@ -22,7 +22,7 @@ export const createSaleSchema = z.object({
   customer: z.string().optional().nullable(),
   items: z.array(saleItemSchema).min(1, "La venta debe tener al menos un producto"),
   total: z.number().nonnegative(),
-  paymentMethod: z.enum(["cash", "card", "transfer"]),
+  paymentMethod: z.enum(["cash", "card", "transfer", "credit"]),
   amountPaid: z.union([z.number(), z.string()]).transform((val) => Number(val)).default(0),
 });
 

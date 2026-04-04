@@ -99,7 +99,30 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             sequential: nextSequential
         })
 
-        // 4. ACTUALIZAR SESIÓN DE CAJA (SI EXISTE)
+        // 4. REGISTRAR EN KARDEX
+        for (const item of items) {
+            const prod = await Product.findById(item.product._id)
+            if (prod) {
+                const { default: Kardex } = await import("@/lib/db/models/Kardex")
+                await Kardex.create({
+                    companyId: context.companyId,
+                    productId: prod._id,
+                    variantId: item.variantId,
+                    variantName: item.variantName,
+                    type: "out",
+                    quantity: -item.quantity,
+                    balanceAfter: item.variantId 
+                         ? (prod as any).variants.find((v: any) => v._id.toString() === item.variantId)?.stock || 0
+                         : prod.stock,
+                    reason: "Venta POS",
+                    referenceId: sale._id,
+                    referenceTicket: ticketNumber,
+                    date: new Date()
+                })
+            }
+        }
+
+        // 5. ACTUALIZAR SESIÓN DE CAJA (SI EXISTE)
         try {
             const activeSession = await CashSession.findOne({
                 userId: context.userId,
@@ -107,14 +130,21 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             })
 
             if (activeSession) {
-                activeSession.totalSales += total
+                // Registrar el ingreso real a la caja (Solo lo pagado ahora)
+                const realIncome = amountPaid || 0;
                 
-                // Actualizar por método de pago
-                if (paymentMethod === 'cash') activeSession.totalCashSales += total
-                else if (paymentMethod === 'card') activeSession.totalCardSales += total
-                else if (paymentMethod === 'transfer') activeSession.totalTransferSales += total
+                if (paymentMethod === 'cash' || paymentMethod === 'credit') {
+                    activeSession.totalCashSales += realIncome;
+                } else if (paymentMethod === 'card') {
+                    activeSession.totalCardSales += realIncome;
+                } else if (paymentMethod === 'transfer') {
+                    activeSession.totalTransferSales += realIncome;
+                }
                 
-                await activeSession.save()
+                // Pero sumar el total a las ventas brutas del turno
+                activeSession.totalSales += total;
+                
+                await activeSession.save();
             }
         } catch (cajaErr) {
             console.error("Error updating cash session totals:", cajaErr)

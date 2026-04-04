@@ -128,7 +128,8 @@
   nav,
   header,
   .sidebar,
-  .print\:hidden {
+  .print\:hidden,
+  [data-sonner-toaster] {
     display: none !important;
   }
 

@@ -18,6 +18,7 @@ export interface ICashSession extends Document {
     totalCashSales: number
     totalCardSales: number
     totalTransferSales: number
+    totalExpenses: number
 }
 
 const CashSessionSchema = new Schema<ICashSession>({
@@ -39,7 +40,8 @@ const CashSessionSchema = new Schema<ICashSession>({
     totalSales: { type: Number, default: 0 },
     totalCashSales: { type: Number, default: 0 },
     totalCardSales: { type: Number, default: 0 },
-    totalTransferSales: { type: Number, default: 0 }
+    totalTransferSales: { type: Number, default: 0 },
+    totalExpenses: { type: Number, default: 0 }
 }, {
     timestamps: true
 })

@@ -55,14 +55,14 @@ export const PATCH = withSessionContext(async (req: NextRequest, { params }: { p
     }
 })
 
-export const DELETE = withSessionContext(async (req: NextRequest, { params }: { params: { id: string } }) => {
+export const DELETE = withSessionContext(async (req: NextRequest, { params, companyId }: { params: { id: string }, companyId: string }) => {
     try {
         await connectDB()
         const saleId = params.id
-        const { companyId } = (req as any).session || {}
 
         const Sale = (await import("@/lib/db/models/Sale")).default
         const Product = (await import("@/lib/db/models/Product")).default
+        const Kardex = (await import("@/lib/db/models/Kardex")).default
 
         const sale = await Sale.findOne({ _id: saleId, companyId })
         if (!sale) {
@@ -89,6 +89,22 @@ export const DELETE = withSessionContext(async (req: NextRequest, { params }: { 
                 product.stock += item.quantity
             }
             await product.save()
+
+            // REGISTRAR EN KARDEX (Devolución)
+            await Kardex.create({
+                companyId,
+                productId: product._id,
+                variantId: item.variantId,
+                type: "in",
+                quantity: item.quantity,
+                balanceAfter: item.variantId 
+                    ? (product as any).variants.find((v: any) => v._id.toString() === item.variantId)?.stock || 0
+                    : product.stock,
+                reason: "Devolución (Venta Anulada)",
+                referenceId: sale._id,
+                referenceTicket: sale.ticketNumber,
+                date: new Date()
+            })
         }
 
         // Marcar como cancelada

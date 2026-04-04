@@ -70,6 +70,20 @@ export const POST = withSessionContext(async (req: NextRequest, context: any) =>
             }
 
             await product.save()
+
+            // REGISTRAR EN KARDEX
+            const { default: Kardex } = await import("@/lib/db/models/Kardex")
+            await Kardex.create({
+                companyId: context.companyId,
+                productId: product._id,
+                type: "in",
+                quantity: item.quantity,
+                balanceAfter: product.stock,
+                reason: "Entrada por Compra",
+                referenceId: null, // Se asignará después si es necesario, o usar el referenceNumber
+                referenceTicket: referenceNumber || "Entrada Manual",
+                date: new Date()
+            })
         }
 
         // Crear registro de Entrada de Stock

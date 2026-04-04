@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { User, Mail, Shield, Calendar, Edit2, Save, X } from "lucide-react"
+import { User, Mail, Shield, Calendar, Edit2, Save, X, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import type { SessionUser } from "@/lib/auth"
@@ -102,9 +102,16 @@ export default function PerfilPage() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Mi Perfil</h1>
-        <p className="text-muted-foreground">Gestiona tu información personal</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <Button variant="outline" size="icon" onClick={() => router.back()} className="h-8 w-8 rounded-full">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <h1 className="text-3xl font-bold">Mi Perfil</h1>
+          </div>
+          <p className="text-muted-foreground ml-11">Gestiona tu información personal</p>
+        </div>
       </div>
 
       <div className="grid gap-6">
