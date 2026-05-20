@@ -980,6 +980,22 @@ export default function POSView() {
                         <span className={styles.totalLabel}>Total:</span>
                         <span className={styles.totalValue}>${getTotal().toLocaleString()}</span>
                     </div>
+                    {paymentMethod === 'cash' && amountPaid && Number(amountPaid) >= getTotal() && (
+                        <div className="flex justify-between items-center p-3 my-3 bg-emerald-100 rounded-xl border border-emerald-300 shadow-inner animate-in fade-in zoom-in duration-300">
+                            <span className="font-bold text-emerald-800 uppercase text-xs tracking-widest">Cambio / Vueltas:</span>
+                            <span className="text-3xl font-black text-emerald-700">
+                                ${(Number(amountPaid) - getTotal()).toLocaleString()}
+                            </span>
+                        </div>
+                    )}
+                    {paymentMethod === 'cash' && amountPaid && Number(amountPaid) > 0 && Number(amountPaid) < getTotal() && (
+                        <div className="flex justify-between items-center p-3 my-3 bg-rose-50 rounded-xl border border-rose-200 animate-in fade-in zoom-in duration-300">
+                            <span className="font-bold text-rose-800 uppercase text-xs tracking-widest">Falta Dinero:</span>
+                            <span className="text-xl font-black text-rose-700">
+                                ${(getTotal() - Number(amountPaid)).toLocaleString()}
+                            </span>
+                        </div>
+                    )}
                     <div className="flex gap-3">
                         <Button 
                             variant="outline"
